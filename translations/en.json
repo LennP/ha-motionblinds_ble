@@ -1,0 +1,25 @@
+{
+    "config": {
+        "abort": {
+            "already_configured": "Device is already configured."
+        },
+        "error": {
+            "cannot_connect": "Failed to connect.",
+            "could_not_find_mac": "Could not find MAC code.",
+            "invalid_auth": "Invalid authentication.",
+            "invalid_mac": "Invalid MAC code.",
+            "no_bluetooth_adapter": "No bluetooth adapter found.",
+            "unknown": "Unexpected error."
+        },
+        "step": {
+            "user": {
+                "data": {
+                    "MAC": "MAC Code"
+                }
+            },
+            "confirm": {
+                "description": "What capabilities does {display_name} have?"
+            }
+        }
+    }
+}
