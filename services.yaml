@@ -6,7 +6,7 @@ connect:
         entity:
           domain: cover
           integration: motionblinds_ble
-    timeout:
+    connection_timeout:
       required: false
       default: 15
       selector:

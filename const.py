@@ -2,22 +2,27 @@
 
 from enum import StrEnum
 
-DOMAIN = "motionblinds_ble"
+ATTR_CONNECTION_TIMEOUT = "connection_timeout"
+ATTR_CONNECTION_TYPE = "connection_type"
 
 CONF_LOCAL_NAME = "local_name"
 CONF_ADDRESS = "address"
-CONF_MAC = "mac"
+CONF_MAC_CODE = "mac_code"
 CONF_BLIND_TYPE = "blind_type"
 
-SERVICE_FAVORITE = "favorite"
+DOMAIN = "motionblinds_ble"
+
+ERROR_ALREADY_CONFIGURED = "already_configured"
+ERROR_COULD_NOT_FIND_MOTOR = "could_not_find_motor"
+ERROR_INVALID_MAC_CODE = "invalid_mac_code"
+ERROR_NO_BLUETOOTH_ADAPTER = "no_bluetooth_adapter"
+
 SERVICE_CONNECT = "connect"
 SERVICE_DISCONNECT = "disconnect"
+SERVICE_FAVORITE = "favorite"
 SERVICE_STATUS = "status"
 
 SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
-
-ATTR_CONNECTION_TIMEOUT = "timeout"
-ATTR_CONNECTION_TYPE = "connection_type"
 
 
 class MotionBlindType(StrEnum):
@@ -26,6 +31,6 @@ class MotionBlindType(StrEnum):
 
 
 class MotionRunningType(StrEnum):
-    OPENING = "opening"
     CLOSING = "closing"
+    OPENING = "opening"
     STILL = "still"

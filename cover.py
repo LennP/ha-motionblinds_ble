@@ -30,7 +30,7 @@ from .const import (
     ATTR_CONNECTION_TYPE,
     CONF_ADDRESS,
     CONF_BLIND_TYPE,
-    CONF_MAC,
+    CONF_MAC_CODE,
     DOMAIN,
     SETTING_DOUBLE_CLICK_TIME,
     MotionBlindType,
@@ -82,11 +82,11 @@ class PositionBlind(CoverEntity):
         super().__init__()
         self._config_entry: ConfigEntry = entry
         self._device_address: str = entry.data[CONF_ADDRESS]
-        self._attr_name: str = f"MotionBlind {entry.data[CONF_MAC]}"
+        self._attr_name: str = f"MotionBlind {entry.data[CONF_MAC_CODE]}"
         self._attr_unique_id: str = entry.data[CONF_ADDRESS]
         self._attr_device_class: CoverDeviceClass = CoverDeviceClass.BLIND
         self._attr_device_info: DeviceInfo = DeviceInfo(
-            identifiers={(DOMAIN, entry.data[CONF_MAC])},
+            identifiers={(DOMAIN, entry.data[CONF_MAC_CODE])},
             manufacturer="MotionBlinds",
             name=self._attr_name,
         )
