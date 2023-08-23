@@ -27,9 +27,10 @@
                     "name": "Entity",
                     "description": "Name of the entity_id to connect to."
                 },
-                "timeout": {
+                "connection_timeout": {
                     "name": "Disconnect time",
-                    "description": "The time in seconds after which Home Assistant will terminate the connection to the device."
+                    "description": "The time in seconds after which Home Assistant will terminate the connection to the device.",
+                    "unit_of_measurement": "seconds"
                 }
             }
         },
