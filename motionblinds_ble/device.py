@@ -249,7 +249,7 @@ class MotionDevice:
             self.set_connection(MotionConnectionType.CONNECTED)
 
             await bleak_client.start_notify(
-                int(MotionCharacteristic.NOTIFICATION.value),
+                str(MotionCharacteristic.NOTIFICATION.value),
                 self._notification_callback,
             )
 
@@ -285,7 +285,7 @@ class MotionDevice:
             _LOGGER.warning("Sending message: %s", MotionCrypt.decrypt(command))
             # response=False to solve Unlikely Error: [org.bluez.Error.Failed] Operation failed with ATT error: 0x0e (Unlikely Error)
             await self._current_bleak_client.write_gatt_char(
-                int(MotionCharacteristic.COMMAND.value),
+                str(MotionCharacteristic.COMMAND.value),
                 bytes.fromhex(command),
                 response=False,
             )
