@@ -35,15 +35,10 @@ class MotionNotificationType(StrEnum):
     STATUS = "12040f02"
 
 
-class MotionRunningType(IntEnum):
-    OPENING = 0x10
-    CLOSING = 0x20
-
-
-class MotionConnectionType(IntEnum):
-    CONNECTED = 0
-    CONNECTING = 1
-    DISCONNECTED = 2
+class MotionConnectionType(StrEnum):
+    CONNECTED = "connected"
+    CONNECTING = "connecting"
+    DISCONNECTED = "disconnected"
 
 
 class MotionRunningType(StrEnum):

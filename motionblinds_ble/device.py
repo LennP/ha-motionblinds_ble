@@ -43,7 +43,6 @@ class MotionDevice:
     # Callbacks that are used to interface with HA
     _ha_create_task: Callable[[Coroutine], Task] = None
     _ha_call_later: Callable[[int, Coroutine], Callable] = None
-    # _ble_device_callback: Callable[[str], BLEDevice] = None
 
     # Regular callbacks
     _position_callback: Callable[[int, int], None] = None
@@ -391,9 +390,3 @@ class MotionDevice:
     ) -> None:
         """Register the callback used to update the motor status, e.g. position, tilt and battery percentage."""
         self._status_callback = callback
-
-    # def register_get_ble_device_callback(
-    #     self, callback: Callable[[str], BLEDevice]
-    # ) -> None:
-    #     """Register the callback used to get a BLEDevice."""
-    #     self._ble_device_callback = callback

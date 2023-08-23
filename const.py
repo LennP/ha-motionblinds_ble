@@ -17,6 +17,7 @@ SERVICE_STATUS = "status"
 SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
 
 ATTR_CONNECTION_TIMEOUT = "timeout"
+ATTR_CONNECTION_TYPE = "connection_type"
 
 
 class MotionBlindType(StrEnum):

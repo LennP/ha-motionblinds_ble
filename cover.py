@@ -27,6 +27,7 @@ from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
 from .const import (
+    ATTR_CONNECTION_TYPE,
     CONF_ADDRESS,
     CONF_BLIND_TYPE,
     CONF_MAC,
@@ -68,7 +69,8 @@ class PositionBlind(CoverEntity):
 
     _device: MotionDevice = None
     _device_address: str = None
-    _attr_connection: MotionConnectionType = MotionConnectionType.DISCONNECTED
+    _attr_translation_key: str = CoverDeviceClass.BLIND.value
+    _attr_connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
 
     _last_stop_click_time: int = None
     _allow_position_feedback: bool = False
@@ -254,7 +256,7 @@ class PositionBlind(CoverEntity):
     @callback
     def async_set_connection(self, connection_type: MotionConnectionType) -> None:
         """Callback used to update the connection status."""
-        self._attr_connection = connection_type
+        self._attr_connection_type = connection_type
         # Reset states if connection is lost, since we don't know the cover position anymore
         if not connection_type == MotionConnectionType.CONNECTED:
             self._attr_is_opening = False
@@ -296,13 +298,7 @@ class PositionBlind(CoverEntity):
     @property
     def extra_state_attributes(self) -> Mapping[str, str]:
         """Return the state attributes."""
-        return {
-            "connected": "Yes"
-            if self._attr_connection == MotionConnectionType.CONNECTED
-            else "Connecting..."
-            if self._attr_connection == MotionConnectionType.CONNECTING
-            else "No"
-        }
+        return {ATTR_CONNECTION_TYPE: self._attr_connection_type}
 
 
 class PositionTiltBlind(PositionBlind):
@@ -339,9 +335,9 @@ class PositionTiltBlind(PositionBlind):
         else:
             self.async_update_running(MotionRunningType.STILL)
 
-    async def async_close_cover_tilt(self, **kwargs: any) -> None:
+    async def async_stop_cover_tilt(self, **kwargs: any) -> None:
         """Stop tilting the blind."""
-        self.async_close_cover(**kwargs)
+        self.async_stop_cover(**kwargs)
 
     async def async_set_cover_tilt_position(self, **kwargs: any) -> None:
         """Tilt the blind to a specific position."""

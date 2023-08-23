@@ -17,6 +17,8 @@ from homeassistant.components.bluetooth.wrappers import HaBleakScannerWrapper, B
 from homeassistant.core import callback
 from bleak import BleakScanner, BleakClient
 
+from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+
 import re
 
 from .const import (
@@ -53,11 +55,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    _discovery_info: BluetoothServiceInfoBleak = None
+    _discovery_info: BluetoothServiceInfoBleak | BLEDevice = None
     _mac: str = None
     _display_name: str = None
     _blind_type: MotionBlindType = None
-    # motionblinds_discovery_result = None
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
@@ -67,10 +68,11 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()
-        self.context["local_name"] = discovery_info.name
+
         self._discovery_info = discovery_info
         self._mac = get_mac_from_local_name(discovery_info.name)
         self._display_name = f"MotionBlind {self._mac}"
+        self.context["local_name"] = discovery_info.name
         self.context["title_placeholders"] = {"name": self._display_name}
         return await self.async_step_confirm()
 
@@ -89,15 +91,15 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         #     description_placeholders={"name": self._display_name},
         # )
 
+        blind_types = [MotionBlindType.POSITION, MotionBlindType.POSITION_TILT]
         return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema(
                 {
-                    vol.Required(CONF_BLIND_TYPE): vol.In(
-                        {
-                            MotionBlindType.POSITION: "Position",
-                            MotionBlindType.POSITION_TILT: "Position & Tilt",
-                        }
+                    vol.Required(CONF_BLIND_TYPE): SelectSelector(
+                        SelectSelectorConfig(
+                            options=blind_types, translation_key=CONF_BLIND_TYPE
+                        )
                     )
                 }
             ),
@@ -119,115 +121,74 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             },
         )
 
-    # async def async_step_integration_discovery(
-    #     self, discovery_info: DiscoveryInfoType
-    # ) -> FlowResult:
-    #     _LOGGER.debug("Found integration")
-    #     return await super().async_step_integration_discovery(discovery_info)
+    async def async_step_user(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Handle a flow initialized by the user."""
+        errors: dict[str, str] = {}
+        if user_input is not None:
+            mac_code = user_input["MAC"]
+            if not is_valid_mac(mac_code):
+                errors["base"] = "invalid_mac"
+            else:
+                # Discover with BLE
+                try:
+                    await self.async_discover_motionblind(mac_code)
+                except NoBluetoothAdapter:
+                    errors: dict[str, str] = {}
+                    errors["base"] = "no_bluetooth_adapter"
+                    return self.async_show_form(
+                        step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+                    )
+                except CouldNotFindMotor:
+                    errors: dict[str, str] = {}
+                    errors["base"] = "could_not_find_mac"
+                    return self.async_show_form(
+                        step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+                    )
 
-    # async def async_step_user(
-    #     self, user_input: dict[str, Any] | None = None
-    # ) -> FlowResult:
-    #     """Handle a flow initialized by the user."""
-    #     errors: dict[str, str] = {}
-    #     if user_input is not None:
-    #         mac = user_input["MAC"]
-    #         if not is_valid_mac(mac):
-    #             errors["base"] = "invalid_mac"
-    #         else:
-    #             # Discover with BLE
-    #             self._motionblinds_discovery_result = (
-    #                 await self._async_discover_motionblind(mac)
-    #             )
+                return await self.async_step_confirm()
 
-    #             return await self._async_step_found_motionblind(mac)
+        # Return and show error
+        return self.async_show_form(
+            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+        )
 
-    #     # Return and show error
-    #     return self.async_show_form(
-    #         step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
-    #     )
+    async def async_discover_motionblind(self, mac: str) -> None:
+        """Discover MotionBlinds initialized by the user."""
+        count = bluetooth.async_scanner_count(self.hass, connectable=True)
+        if count == 0:
+            self.hass.async_create_task(
+                self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)
+            )
+            _LOGGER.error("Could not find any bluetooth adapter")
+            raise NoBluetoothAdapter()
 
-    # async def _async_step_found_motionblind(self, mac) -> FlowResult:
-    #     _LOGGER.warning("Finishing 3")
-    #     res = self._motionblinds_discovery_result
-    #     if res is NoBluetoothAdapter:
-    #         errors: dict[str, str] = {}
-    #         errors["base"] = "no_bluetooth_adapter"
-    #         return self.async_show_form(
-    #             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
-    #         )
-    #     elif res is CouldNotFindMAC:
-    #         errors: dict[str, str] = {}
-    #         errors["base"] = "could_not_find_mac"
-    #         return self.async_show_form(
-    #             step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
-    #         )
-    #     return self.async_create_entry(title="Some title", data={})
+        _LOGGER.warning(count)
+        _LOGGER.warning("Getting scanner")
+        bleak_scanner = bluetooth.async_get_scanner(self.hass)
+        _LOGGER.warning("Discovering")
+        # No timeout?
+        devices = await bleak_scanner.discover()
+        _LOGGER.warning("Finished discovery")
 
-    # async def _async_discover_motionblind(self, mac: str):
-    #     # Discover
-    #     # await asyncio.sleep(2)  # A task that take some time to complete
+        _LOGGER.warning(devices)
 
-    #     motionblind_address = CouldNotFindMAC
+        motion_device: BLEDevice = None
 
-    #     count = bluetooth.async_scanner_count(self.hass, connectable=True)
-    #     if count == 0:
-    #         self.hass.async_create_task(
-    #             self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)
-    #         )
-    #         _LOGGER.error("Could not find any bluetooth adapter.")
-    #         return NoBluetoothAdapter
+        for device in devices:
+            if f"MOTION_{mac.upper()}" in device.name:
+                motion_device = device
+                self._discovery_info = device
+                self._mac = mac.upper()
+                self._display_name = f"MotionBlind {self._mac}"
+                break
 
-    #     try:
-    #         _LOGGER.warning(count)
-    #         _LOGGER.warning("Getting scanner")
-    #         bleak_scanner = bluetooth.async_get_scanner(self.hass)
-    #         _LOGGER.warning("Discovering")
-    #         # No timeout?
-    #         devices = await bleak_scanner.discover()
-    #         _LOGGER.warning("Finished discovery")
+        if not motion_device:
+            raise CouldNotFindMotor
 
-    #     except Exception as e:
-    #         _LOGGER.error(e)
-
-    #     _LOGGER.warning(devices)
-
-    #     motionDevice = None
-
-    #     for device in devices:
-    #         if f"MOTION_{mac.upper()}" in device.name:
-    #             motionDevice = device.name
-    #             motionblind_address = device.address
-
-    #     _LOGGER.warning(f"Found motion device: {motionDevice}")
-
-    #     _LOGGER.warning("Finishing")
-    #     return motionblind_address
-
-    # async def async_step_progress_done(self, user_input=None) -> FlowResult:
-    #     # Show progress can only transition to show progress or show progress done.
-    #     _LOGGER.warning("Finishing 2")
-    #     return self.async_show_progress_done(next_step_id="finish")
-
-    # @callback
-    # def _async_motionblind_found(
-    #     service_info: bluetooth.BluetoothServiceInfoBleak,
-    #     change: bluetooth.BluetoothChange,
-    # ):
-    #     _LOGGER.log("Found")
-
-    # async def async_step_discover_motionblind(
-    #     self, user_input: dict[str, Any] | None = None
-    # ) -> FlowResult:
-    #     mac = user_input["MAC"]
-
-    #     return bluetooth.async_register_callback(
-    #         self.hass,
-    #         self._async_motionblind_found,
-    #         {"local_name": f"MOTION_{mac}"},
-    #         bluetooth.BluetoothScanningMode.ACTIVE,
-    #     )
-    #     # return self.async_create_entry(title="info["title"]", data=user_input)
+        _LOGGER.warning(f"Found motion device: {motion_device}")
+        _LOGGER.warning("Finishing")
 
 
 class NoBluetoothAdapter(HomeAssistantError):
@@ -238,5 +199,5 @@ class InvalidMAC(HomeAssistantError):
     """Error to indicate the MAC code is invalid."""
 
 
-class CouldNotFindMAC(HomeAssistantError):
-    """Error to indicate the MAC code is invalid."""
+class CouldNotFindMotor(HomeAssistantError):
+    """Error to indicate no motor with that MAC code could be found."""

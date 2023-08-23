@@ -1,44 +1,97 @@
 {
-  "config": {
-      "abort": {
-          "already_configured": "Device is already configured."
-      },
-      "error": {
-          "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-          "could_not_find_mac": "Could not find MAC code.",
-          "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-          "invalid_mac": "Invalid MAC code.",
-          "no_bluetooth_adapter": "No bluetooth adapter found.",
-          "unknown": "[%key:common::config_flow::error::unknown%]"
-      },
-      "step": {
-          "user": {
-              "description": "Fill in the 4-character MAC code of your motor, for example F3ED or E3A6.",
-              "data": {
-                  "MAC": "MAC code"
-              }
-          },
-          "confirm": {
-              "description": "What capabilities does {display_name} have?",
-              "data": {
-                  "blind_type": {
-                      "title": "Blind Type",
-                      "options" : {
-                          "position": "Position",
-                          "position_tilt": "Position & Tilt"
-                      }
-                  }
-              }
-          }
+    "config": {
+        "abort": {
+            "already_configured": "Device is already configured."
+        },
+        "error": {
+            "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+            "could_not_find_mac": "Could not find a motor with that MAC code.",
+            "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+            "invalid_mac": "Invalid MAC code.",
+            "no_bluetooth_adapter": "No bluetooth adapter found.",
+            "unknown": "[%key:common::config_flow::error::unknown%]"
+        },
+        "step": {
+            "user": {
+                "description": "Fill in the 4-character MAC code of your motor, for example F3ED or E3A6.",
+                "data": {
+                    "MAC": "MAC code"
+                }
+            },
+            "confirm": {
+                "description": "What capabilities does {display_name} have?"
+            }
+        }
+    },
+    "services": {
+        "connect": {
+            "name": "Connect",
+            "description": "Connects to the blind, if already connected it updates the disconnect timer.",
+            "fields": {
+                "entity_id": {
+                    "name": "Entity",
+                    "description": "Name of the entity_id to connect to."
+                },
+                "timeout": {
+                    "name": "Disconnect time",
+                    "description": "The time in seconds after which Home Assistant will terminate the connection to the device."
+                }
+            }
+        },
+        "disconnect": {
+            "name": "Disconnect",
+            "description": "Terminates the connection to the blind, or stops connecting.",
+            "fields": {
+                "entity_id": {
+                    "name": "Entity",
+                    "description": "Name of the entity_id to terminate the connection with."
+                }
+            }
+        },
+        "favorite": {
+            "name": "Favorite position",
+            "description": "Moves the blind to the favorite position.",
+            "fields": {
+                "entity_id": {
+                    "name": "Entity",
+                    "description": "Name of the entity_id to move to the favorite position."
+                }
+            }
+        },
+        "status": {
+            "name": "Status information",
+            "description": "Gets the position, tilt and battery percentage information from the motor.",
+            "fields": {
+                "entity_id": {
+                    "name": "Entity",
+                    "description": "Name of the entity_id to get status information from."
+                }
+            }
+        }
+    },
+    "selector": {
+      "blind_type": {
+        "title": "Blind Type",
+        "options" : {
+            "position": "Position",
+            "position_tilt": "Position & Tilt"
+        }
       }
-  },
-  "selector": {
-    "blind_type": {
-      "title": "Blind Type",
-      "options" : {
-          "position": "Position",
-          "position_tilt": "Position & Tilt"
-      }
+    },
+    "entity": {
+        "cover": {
+            "blind": {
+                "state_attributes": {
+                    "connection_type": {
+                        "name": "Connected",
+                        "state": {
+                            "connected": "Yes",
+                            "connecting": "Connecting...",
+                            "disconnected": "No"
+                        }
+                    }
+                }
+            }
+        }
     }
-  }
 }
