@@ -1,11 +1,11 @@
 """Encryption for MotionBlinds BLE."""
 import datetime
+import logging
+
 from Crypto.Cipher import AES
 from Crypto.Cipher._mode_ecb import EcbMode
-from Crypto.Util.Padding import unpad, pad
+from Crypto.Util.Padding import pad, unpad
 from pytz import timezone
-
-import logging
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -19,7 +19,7 @@ class MotionCrypt:
     cipher: EcbMode = AES.new(encryption_key, AES.MODE_ECB)
 
     @staticmethod
-    def set_timezone(tz: str) -> str:
+    def set_timezone(tz: str) -> None:
         MotionCrypt.tz = timezone(tz)
 
     @staticmethod

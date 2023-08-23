@@ -1,8 +1,8 @@
 """Constants for MotionBlinds BLE."""
-from enum import StrEnum, IntEnum
+from enum import IntEnum, StrEnum
 
-
-SETTING_CONNECT_ATTEMPTS = 5
+SETTING_MAX_CONNECT_ATTEMPTS = 5
+SETTING_DISCONNECT_TIME = 15  # Seconds
 
 
 class MotionService(StrEnum):
@@ -30,7 +30,7 @@ class MotionCommandType(StrEnum):
 
 
 class MotionNotificationType(StrEnum):
-    PERCENT = "070404020e"
+    PERCENT = "07040402"
     RUNNING = "070404021e"
     STATUS = "12040f02"
 
@@ -44,3 +44,9 @@ class MotionConnectionType(IntEnum):
     CONNECTED = 0
     CONNECTING = 1
     DISCONNECTED = 2
+
+
+class MotionRunningType(StrEnum):
+    OPENING = "opening"
+    CLOSING = "closing"
+    STILL = "still"

@@ -18,7 +18,7 @@
   "documentation": "https://www.home-assistant.io/integrations/MotionBlinds_BLE",
   "homekit": {},
   "iot_class": "assumed_state",
-  "requirements": ["pycryptodome==3.18.0"],
+  "requirements": [],
   "ssdp": [],
   "zeroconf": []
 }

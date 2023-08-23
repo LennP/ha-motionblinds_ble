@@ -1,23 +1,44 @@
 {
   "config": {
-    "step": {
-      "user": {
-        "description": "Fill in the MAC code of your motor, for example F3ED or E3A6.",
-        "data": {
-          "MAC": "MAC Code"
-        }
+      "abort": {
+          "already_configured": "Device is already configured."
+      },
+      "error": {
+          "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
+          "could_not_find_mac": "Could not find MAC code.",
+          "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
+          "invalid_mac": "Invalid MAC code.",
+          "no_bluetooth_adapter": "No bluetooth adapter found.",
+          "unknown": "[%key:common::config_flow::error::unknown%]"
+      },
+      "step": {
+          "user": {
+              "description": "Fill in the 4-character MAC code of your motor, for example F3ED or E3A6.",
+              "data": {
+                  "MAC": "MAC code"
+              }
+          },
+          "confirm": {
+              "description": "What capabilities does {display_name} have?",
+              "data": {
+                  "blind_type": {
+                      "title": "Blind Type",
+                      "options" : {
+                          "position": "Position",
+                          "position_tilt": "Position & Tilt"
+                      }
+                  }
+              }
+          }
       }
-    },
-    "error": {
-      "cannot_connect": "[%key:common::config_flow::error::cannot_connect%]",
-      "invalid_auth": "[%key:common::config_flow::error::invalid_auth%]",
-      "unknown": "[%key:common::config_flow::error::unknown%]",
-      "invalid_mac": "Invalid MAC code.",
-      "could_not_find_mac": "Could not find MAC code.",
-      "no_bluetooth_adapter": "No bluetooth adapter found."
-    },
-    "abort": {
-      "already_configured": "[%key:common::config_flow::abort::already_configured_device%]"
+  },
+  "selector": {
+    "blind_type": {
+      "title": "Blind Type",
+      "options" : {
+          "position": "Position",
+          "position_tilt": "Position & Tilt"
+      }
     }
   }
 }

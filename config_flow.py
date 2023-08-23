@@ -93,10 +93,10 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             step_id="confirm",
             data_schema=vol.Schema(
                 {
-                    CONF_BLIND_TYPE: vol.In(
+                    vol.Required(CONF_BLIND_TYPE): vol.In(
                         {
-                            MotionBlindType.POSITION: MotionBlindType.POSITION,
-                            MotionBlindType.POSITION_TILT: MotionBlindType.POSITION_TILT,
+                            MotionBlindType.POSITION: "Position",
+                            MotionBlindType.POSITION_TILT: "Position & Tilt",
                         }
                     )
                 }

@@ -9,9 +9,22 @@ CONF_ADDRESS = "address"
 CONF_MAC = "mac"
 CONF_BLIND_TYPE = "blind_type"
 
-SETTING_DISCONNECT_TIME = 15
+SERVICE_FAVORITE = "favorite"
+SERVICE_CONNECT = "connect"
+SERVICE_DISCONNECT = "disconnect"
+SERVICE_STATUS = "status"
+
+SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
+
+ATTR_CONNECTION_TIMEOUT = "timeout"
 
 
 class MotionBlindType(StrEnum):
-    POSITION = "Position"
-    POSITION_TILT = "Position & Tilt"
+    POSITION = "position"
+    POSITION_TILT = "position_tilt"
+
+
+class MotionRunningType(StrEnum):
+    OPENING = "opening"
+    CLOSING = "closing"
+    STILL = "still"
