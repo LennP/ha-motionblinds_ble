@@ -194,8 +194,8 @@ class NoBluetoothAdapter(HomeAssistantError):
 
 
 EXCEPTION_MAP = {
-    NoBluetoothAdapter: "no_bluetooth_adapter",
-    CouldNotFindMotor: "could_not_find_motor",
-    AlreadyConfigured: "already_configured",
-    InvalidMACCode: "invalid_mac_code",
+    NoBluetoothAdapter: ERROR_NO_BLUETOOTH_ADAPTER,
+    CouldNotFindMotor: ERROR_COULD_NOT_FIND_MOTOR,
+    AlreadyConfigured: ERROR_ALREADY_CONFIGURED,
+    InvalidMACCode: ERROR_INVALID_MAC_CODE,
 }
