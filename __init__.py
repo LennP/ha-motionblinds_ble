@@ -25,7 +25,7 @@ from .const import (
 from .cover import PositionBlind
 from .motionblinds_ble.crypt import MotionCrypt
 
-PLATFORMS: list[Platform] = [Platform.COVER, Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.COVER, Platform.SENSOR, Platform.SELECT]
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,7 +128,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     hass.data.setdefault(DOMAIN, {})
 
     await hass.config_entries.async_forward_entry_setups(entry, [Platform.COVER])
-    await hass.config_entries.async_forward_entry_setups(entry, [Platform.SENSOR])
+    await hass.config_entries.async_forward_entry_setups(
+        entry, [Platform.SENSOR, Platform.SELECT]
+    )
 
     _LOGGER.info("Fully loaded entity")
     return True

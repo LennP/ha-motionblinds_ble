@@ -13,7 +13,7 @@ from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, ATTR_BATTERY
 from .cover import PositionBlind
 
 _LOGGER = logging.getLogger(__name__)
@@ -21,8 +21,9 @@ _LOGGER = logging.getLogger(__name__)
 PARALLEL_UPDATES = 0
 
 SENSOR_TYPES: dict[str, SensorEntityDescription] = {
-    "battery": SensorEntityDescription(
-        key="battery",
+    ATTR_BATTERY: SensorEntityDescription(
+        key=ATTR_BATTERY,
+        translation_key=ATTR_BATTERY,
         native_unit_of_measurement=PERCENTAGE,
         device_class=SensorDeviceClass.BATTERY,
         state_class=SensorStateClass.MEASUREMENT,
@@ -46,6 +47,7 @@ class BatterySensor(SensorEntity):
 
     def __init__(self, blind: PositionBlind) -> None:
         """Initialize the battery sensor."""
+        self.entity_description = SENSOR_TYPES[ATTR_BATTERY]
         self._blind = blind
         self._attr_name = f"{blind.name} Battery"
         self._attr_unique_id = f"{blind.unique_id}_battery"

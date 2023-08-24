@@ -24,6 +24,7 @@ from .const import (
     ERROR_COULD_NOT_FIND_MOTOR,
     ERROR_INVALID_MAC_CODE,
     ERROR_NO_BLUETOOTH_ADAPTER,
+    ERROR_NO_DEVICES_FOUND,
     MotionBlindType,
 )
 
@@ -81,14 +82,16 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             self._blind_type = user_input[CONF_BLIND_TYPE]
             return await self._async_create_entry_from_discovery(user_input)
 
-        blind_types = [MotionBlindType.POSITION, MotionBlindType.POSITION_TILT]
         return self.async_show_form(
             step_id="confirm",
             data_schema=vol.Schema(
                 {
                     vol.Required(CONF_BLIND_TYPE): SelectSelector(
                         SelectSelectorConfig(
-                            options=blind_types, translation_key=CONF_BLIND_TYPE
+                            options=[
+                                blind_type.value for blind_type in MotionBlindType
+                            ],
+                            translation_key=CONF_BLIND_TYPE,
                         )
                     )
                 }
@@ -143,6 +146,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             raise InvalidMACCode()
 
         count = bluetooth.async_scanner_count(self.hass, connectable=True)
+        _LOGGER.warning(count)
         if count == 0:
             self.hass.async_create_task(
                 self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)
@@ -153,11 +157,16 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         bleak_scanner = bluetooth.async_get_scanner(self.hass)
         devices = await bleak_scanner.discover()
 
+        if len(devices) == 0:
+            raise NoDevicesFound()
+
         motion_device: BLEDevice = next(
             (
                 device
                 for device in devices
-                if f"MOTION_{mac_code.upper()}" in device.name
+                if device
+                and device.name
+                and f"MOTION_{mac_code.upper()}" in device.name
             ),
             None,
         )
@@ -193,8 +202,13 @@ class NoBluetoothAdapter(HomeAssistantError):
     """Error to indicate no bluetooth adapter could be found."""
 
 
+class NoDevicesFound(HomeAssistantError):
+    """Error to indicate no bluetooth devices could be found."""
+
+
 EXCEPTION_MAP = {
     NoBluetoothAdapter: ERROR_NO_BLUETOOTH_ADAPTER,
+    NoDevicesFound: ERROR_NO_DEVICES_FOUND,
     CouldNotFindMotor: ERROR_COULD_NOT_FIND_MOTOR,
     AlreadyConfigured: ERROR_ALREADY_CONFIGURED,
     InvalidMACCode: ERROR_INVALID_MAC_CODE,

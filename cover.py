@@ -36,7 +36,7 @@ from .const import (
     MotionBlindType,
     MotionRunningType,
 )
-from .motionblinds_ble.const import MotionConnectionType
+from .motionblinds_ble.const import MotionConnectionType, MotionSpeedLevel
 from .motionblinds_ble.device import MotionDevice
 
 _LOGGER = logging.getLogger(__name__)
@@ -76,6 +76,7 @@ class PositionBlind(CoverEntity):
     _allow_position_feedback: bool = False
 
     _battery_callback: Callable[[int], None] = None
+    _speed_callback: Callable[[MotionSpeedLevel], None] = None
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the blind."""
@@ -200,6 +201,12 @@ class PositionBlind(CoverEntity):
         if await self._device.favorite():
             self.async_refresh_disconnect_timer()
 
+    async def async_speed(self, speed_level: MotionSpeedLevel, **kwargs: any) -> None:
+        """Change the speed level of the device."""
+        _LOGGER.info("Speed %s", self._device_address)
+        if await self._device.speed(speed_level):
+            self.async_refresh_disconnect_timer()
+
     async def async_set_cover_position(self, **kwargs: any) -> None:
         """Move the blind to a specific position."""
         new_position = 100 - kwargs.get(ATTR_POSITION)
@@ -268,7 +275,7 @@ class PositionBlind(CoverEntity):
 
     @callback
     def async_update_status(
-        self, position_percentage: int, tilt_percentage: int, battery_percentage: int
+        self, position_percentage: int, tilt_percentage: int, battery_percentage: int, speed_level: MotionSpeedLevel
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
         # Only update position based on feedback when necessary, otherwise cover UI will jump around
@@ -280,6 +287,8 @@ class PositionBlind(CoverEntity):
 
         if self._battery_callback is not None:
             self._battery_callback(battery_percentage)
+        if self._speed_callback is not None:
+            self._speed_callback(speed_level)
         self.async_write_ha_state()
 
     @callback
@@ -294,6 +303,12 @@ class PositionBlind(CoverEntity):
     ) -> None:
         """Register the callback used to update the battery percentage."""
         self._battery_callback = _battery_callback
+
+    def async_register_speed_callback(
+        self, _speed_callback: Callable[[MotionSpeedLevel], None]
+    ) -> None:
+        """Register the callback used to update the speed level."""
+        self._speed_callback = _speed_callback
 
     @property
     def extra_state_attributes(self) -> Mapping[str, str]:

@@ -25,6 +25,7 @@ from .const import (
     MotionConnectionType,
     MotionNotificationType,
     MotionRunningType,
+    MotionSpeedLevel,
 )
 from .crypt import MotionCrypt
 
@@ -48,7 +49,7 @@ class MotionDevice:
     _position_callback: Callable[[int, int], None] = None
     _running_callback: Callable[[bool], None] = None
     _connection_callback: Callable[[MotionConnectionType], None] = None
-    _status_callback: Callable[[int, int, int], None] = None
+    _status_callback: Callable[[int, int, int, MotionSpeedLevel], None] = None
 
     # Used to ensure the first caller connects, but the last caller's command goes through when connecting
     _connection_task: Task = None
@@ -166,8 +167,11 @@ class MotionDevice:
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
             battery_percentage: int = decrypted_message_bytes[17]
+            speed_level: MotionSpeedLevel = MotionSpeedLevel(
+                decrypted_message_bytes[12]
+            )
             self._status_callback(
-                position_percentage, angle_percentage, battery_percentage
+                position_percentage, angle_percentage, battery_percentage, speed_level
             )
 
     def _disconnect_callback(self, client: BleakClient) -> None:
@@ -342,6 +346,13 @@ class MotionDevice:
         command_prefix = str(MotionCommandType.FAVORITE.value)
         return await self._send_command(command_prefix)
 
+    async def speed(self, speed_level: MotionSpeedLevel) -> bool:
+        """Change the speed level of the device."""
+        command_prefix = str(MotionCommandType.SPEED.value) + hex(
+            int(speed_level.value)
+        )[2:].zfill(2)
+        return await self._send_command(command_prefix)
+
     async def percentage_tilt(self, percentage: int) -> bool:
         """Tilt the device to a specific position."""
         angle = round(180 * percentage / 100)
@@ -386,7 +397,7 @@ class MotionDevice:
         self._connection_callback = callback
 
     def register_status_callback(
-        self, callback: Callable[[int, int, int], None]
+        self, callback: Callable[[int, int, int, MotionSpeedLevel], None]
     ) -> None:
         """Register the callback used to update the motor status, e.g. position, tilt and battery percentage."""
         self._status_callback = callback

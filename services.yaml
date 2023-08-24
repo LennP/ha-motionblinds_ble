@@ -13,6 +13,7 @@ connect:
         number:
           min: 0
           max: 3600
+          unit_of_measurement: seconds
 disconnect:
   fields:
     entity_id:
