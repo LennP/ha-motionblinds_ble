@@ -1,6 +1,6 @@
 # HA-MotionBlinds_BLE
 
-This Home Assistant integration adds support for **MotionBlinds** bluetooth motors. Beware that this integration does not work for **Eve MotionBlinds** motors.
+This Home Assistant integration adds support for **MotionBlinds** bluetooth motors. Beware that this integration does not work for **Eve MotionBlinds** motors. **Eve MotionBlinds** can be added to Home Assistant using the [HomeKit](https://www.home-assistant.io/integrations/homekit_controller/) integration.
 
 
 # Setup
