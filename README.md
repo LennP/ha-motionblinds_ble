@@ -8,9 +8,9 @@ MotionBlinds BLE devices will be automatically discovered by Home Assistant, and
 
 During the setup, you will be asked what capabilities your MotionBlind has. There are 3 different capabilities:
 
-- **Position**: for blinds that only offer the capacity to change the position. Used for regular roller blinds, curtain blinds.
-- **Tilt**: for blinds that only offer the capability to tilt. Used for tilt-only venetian blinds.
-- **Position & tilt**: for blinds that offer both position and tilt capability. Used for regular venetian blinds.
+- **Position**: for blinds that only offer the capacity to change the position. Used for Roller blinds, Roman blinds, Honeycomb blinds, Curtain blinds.
+- **Tilt**: for blinds that only offer the capability to tilt. Used for tilt-only Venetian blinds.
+- **Position & tilt**: for blinds that offer both position and tilt capability. Used for regular Venetian blinds, Double Roller blinds and Vertical blinds.
 
 # Control
 Upon controlling your MotionBlind using Home Assistant, the motor will automatically first be connected to. The default time the blinds will stay connected to is 15 seconds, which is reset to 15 seconds every time you control your blinds with Home Assistant. There is also the option to connect to your blind for longer periods of time using [services](#services), though this may significantly impact battery life.
