@@ -8,16 +8,16 @@ MotionBlinds BLE devices will be automatically discovered by Home Assistant, and
 
 During the setup, you will be asked what capabilities your MotionBlind has. There are 3 different capabilities:
 
-- **Position**: for blinds that only offer the capacity to change the position. Used for regular roller blinds, curtain blinds,
+- **Position**: for blinds that only offer the capacity to change the position. Used for regular roller blinds, curtain blinds.
 - **Tilt**: for blinds that only offer the capability to tilt. Used for tilt-only venetian blinds.
-- **Position & tilt**: for blinds that offer both position and tilt capabilities. Used for regular venetian blinds.
+- **Position & tilt**: for blinds that offer both position and tilt capability. Used for regular venetian blinds.
 
 # Control
-
+Upon controlling your MotionBlind using Home Assistant, the motor will automatically first be connected to. The default time the blinds will stay connected to is 15 seconds, which is reset to 15 seconds every time you control your blinds. There is also the option to connect to your blind for longer periods of time using [services](#services), though this may significantly impact battery life.
 
 # Services
 The MotionBlinds BLE integration offers four different services, in addition to the ones of a standard Home Assistant [`Cover`](https://www.home-assistant.io/integrations/cover/#services) entity, which can be used to automate your MotionBlinds:
-- **Connect**: Used to connect to a motor. Optionally, one can specify how long to stay connected for. By default, this is 15 seconds.
+- **Connect**: Used to connect to a motor. By default, the motor will stay connected to for 15 seconds. Optionally, one can specify a different time before the connection with the motor is terminated by Home Assistant. **However**, staying connected to the motor for longer than 15 seconds may significantly reduce battery life.
 - **Disconnect**: Used to terminate the connection with a motor, even if Home Assistant is currently connecting to it.
 - **Favorite**: Used to make the blind move to the favorite position (if not connected, this command will also connect).
 - **Status**: Used to retrieve blind position, tilt and battery percentage (if not connected, this command will also connect).
