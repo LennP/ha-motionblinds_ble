@@ -91,36 +91,29 @@ class GenericBlind(CoverEntity):
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
-        try:
-            ble_device = async_ble_device_from_address(self.hass, self._device_address)
-            self._device = MotionDevice(self._device_address, ble_device)
-            async_register_callback(
-                self.hass,
-                self.async_update_ble_device,
-                BluetoothCallbackMatcher(address=self._device_address),
-                BluetoothScanningMode.ACTIVE,
+        ble_device = async_ble_device_from_address(self.hass, self._device_address)
+        self._device = MotionDevice(self._device_address, ble_device)
+        async_register_callback(
+            self.hass,
+            self.async_update_ble_device,
+            BluetoothCallbackMatcher(address=self._device_address),
+            BluetoothScanningMode.ACTIVE,
+        )
+        # Pass functions used to schedule tasks
+        self._device.set_ha_create_task(
+            partial(
+                self._config_entry.async_create_task,
+                hass=self.hass,
+                name=self._device_address,
             )
-            # Pass functions used to schedule tasks
-            self._device.set_ha_create_task(
-                partial(
-                    self._config_entry.async_create_task,
-                    hass=self.hass,
-                    name=self._device_address,
-                )
-            )
-            self._device.set_ha_call_later(partial(async_call_later, hass=self.hass))
-            self.hass.data[DOMAIN][self.entity_id] = self
-            # Register callbacks
-            self._device.register_running_callback(self.async_update_running)
-            self._device.register_position_callback(self.async_update_position)
-            self._device.register_connection_callback(self.async_set_connection)
-            self._device.register_status_callback(self.async_update_status)
-        except Exception as e:
-            _LOGGER.warning(
-                "Could not find the BLEDevice for address %s: %s",
-                self._device_address,
-                e,
-            )
+        )
+        self._device.set_ha_call_later(partial(async_call_later, hass=self.hass))
+        self.hass.data[DOMAIN][self.entity_id] = self
+        # Register callbacks
+        self._device.register_running_callback(self.async_update_running)
+        self._device.register_position_callback(self.async_update_position)
+        self._device.register_connection_callback(self.async_set_connection)
+        self._device.register_status_callback(self.async_update_status)
         await super().async_added_to_hass()
 
     def async_refresh_disconnect_timer(

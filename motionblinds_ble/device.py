@@ -6,16 +6,17 @@ from asyncio import (
     TimerHandle,
     create_task,
     get_event_loop,
-    sleep,
+    Future,
 )
 from collections.abc import Callable, Coroutine
 from datetime import datetime
-from time import time_ns
+from time import time_ns, time
 
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
+from bleak.exc import BleakError
 from bleak.backends.device import BLEDevice
-from bleak_retry_connector import establish_connection
+from bleak_retry_connector import establish_connection, BleakOutOfConnectionSlotsError
 
 from .const import (
     SETTING_DISCONNECT_TIME,
@@ -54,6 +55,8 @@ class MotionDevice:
     # Used to ensure the first caller connects, but the last caller's command goes through when connecting
     _connection_task: Task = None
     _last_connection_caller_time: int = None
+    _received_ready: Future[bool] = None
+    _test_time = None
 
     def __init__(self, _address: str, _ble_device: BLEDevice = None) -> None:
         self._device_address = _address
@@ -63,9 +66,8 @@ class MotionDevice:
             _LOGGER.warning(
                 "Could not find BLEDevice, creating new BLEDevice from address"
             )
-            _fake_rssi = 0
             self._ble_device = BLEDevice(
-                self._device_address, self._device_address, {}, _fake_rssi
+                self._device_address, self._device_address, {}, rssi=0
             )
 
     def set_ble_device(self, ble_device: BLEDevice) -> None:
@@ -173,6 +175,14 @@ class MotionDevice:
             self._status_callback(
                 position_percentage, angle_percentage, battery_percentage, speed_level
             )
+        elif (
+            decrypted_message.startswith(MotionNotificationType.READY.value)
+            and self._received_ready is not None
+            and not self._received_ready.done()
+        ):
+            if self._test_time is not None:
+                _LOGGER.warning("Received ready in %s", str(time() - self._test_time))
+            self._received_ready.set_result(True)
 
     def _disconnect_callback(self, client: BleakClient) -> None:
         """Callback called by Bleak when a client disconnects."""
@@ -180,7 +190,7 @@ class MotionDevice:
         self.set_connection(MotionConnectionType.DISCONNECTED)
 
     async def connect(self) -> None:
-        """Connect to the device if not connected, returns whether or not the connection was successful."""
+        """Connect to the device if not connected, return whether or not the motor is ready for a command."""
         if not self.is_connected():
             # Connect if not connected yet and not busy connecting
             return await self._connect_if_not_connecting()
@@ -200,7 +210,7 @@ class MotionDevice:
             self._current_bleak_client = None
 
     async def _connect_if_not_connecting(self) -> bool:
-        """Connect if no connection is currently attempted, return True if the connection is successful and only to the last caller of this function."""
+        """Connect if no connection is currently attempted, return True if the motor is ready for a command and only to the last caller."""
         # Don't try to connect if we are already connecting
         this_connection_caller_time = time_ns()
         self._last_connection_caller_time = this_connection_caller_time
@@ -222,55 +232,53 @@ class MotionDevice:
             _LOGGER.info("Cancelled connecting")
             self.set_connection(MotionConnectionType.DISCONNECTED)
             return False
+
         self._connection_task = None
         return (
             self._last_connection_caller_time == this_connection_caller_time
         )  # Return whether or not this function was the last caller
 
     async def _connect(self) -> bool:
-        """Connect to the device, return whether or not the connection was successful."""
+        """Connect to the device, return whether or not the motor is ready for a command."""
         if self._connection_type is MotionConnectionType.CONNECTING:
             return False
-        try:
-            self.set_connection(MotionConnectionType.CONNECTING)
-            _LOGGER.info("Connecting to %s", self._device_address)
 
-            # Standard
-            # bleak_client = await self._get_bleak_client()
-            # await bleak_client.connect()
+        self.set_connection(MotionConnectionType.CONNECTING)
+        _LOGGER.info("Connecting to %s", self._device_address)
 
-            # Bleak retry
-            _LOGGER.info("Establishing connection")
-            bleak_client = await establish_connection(
-                BleakClient,
-                self._ble_device,
-                self._device_address,
-                max_attempts=SETTING_MAX_CONNECT_ATTEMPTS,
-            )
+        _LOGGER.info("Establishing connection")
+        bleak_client = await establish_connection(
+            BleakClient,
+            self._ble_device,
+            self._device_address,
+            max_attempts=SETTING_MAX_CONNECT_ATTEMPTS,
+        )
 
-            _LOGGER.info("Connected to %s", self._device_address)
-            self._current_bleak_client = bleak_client
-            self.set_connection(MotionConnectionType.CONNECTED)
+        _LOGGER.info("Connected to %s", self._device_address)
+        self._current_bleak_client = bleak_client
+        self.set_connection(MotionConnectionType.CONNECTED)
 
-            await bleak_client.start_notify(
-                str(MotionCharacteristic.NOTIFICATION.value),
-                self._notification_callback,
-            )
+        await bleak_client.start_notify(
+            str(MotionCharacteristic.NOTIFICATION.value),
+            self._notification_callback,
+        )
 
-            await self.set_key()
-            await self.status_query()
+        # Cancel any command still waiting for ready notification, assume the connection is ready
+        if self._received_ready is not None and not self._received_ready.done():
+            _LOGGER.warning("Cancel received ready, new connect")
+            self._received_ready.set_result(False)
+        self._received_ready = Future()
 
-            bleak_client.set_disconnected_callback(self._disconnect_callback)
+        self._test_time = time()
+        await self.set_key()
+        await self.status_query()
 
-            # There must be some delay between set_key and returning True, since the motor needs some time to process set_key
-            await sleep(0.1)
+        bleak_client.set_disconnected_callback(self._disconnect_callback)
 
-            return True
-        except Exception as e:
-            _LOGGER.error("Could not connect to %s: %s", self._device_address, e)
-            self._connection_task = None
-            self.set_connection(MotionConnectionType.DISCONNECTED)
-            return False
+        # Wait for ready notification from motor before sending the first control command
+        # Sometimes using a proxy results in the device taking longer to be ready, meaning the first control command would be sent too early and not working
+        return await self._received_ready
+        # return True
 
     def is_connected(self) -> bool:
         """Return whether or not the device is connected."""
@@ -279,44 +287,54 @@ class MotionDevice:
             and self._current_bleak_client.is_connected
         )
 
-    async def _send_command(self, command_prefix: str) -> bool:
+    async def _send_command(
+        self, command_prefix: str, connection_command: bool = False
+    ) -> bool:
         """Write a message to the command characteristic, return whether or not the command was successfully executed."""
         if not await self.connect():
             return False
-        try:
-            # Command must be generated just before sending due get_time timing
-            command = MotionCrypt.encrypt(command_prefix + MotionCrypt.get_time())
-            _LOGGER.warning("Sending message: %s", MotionCrypt.decrypt(command))
-            # response=False to solve Unlikely Error: [org.bluez.Error.Failed] Operation failed with ATT error: 0x0e (Unlikely Error)
-            await self._current_bleak_client.write_gatt_char(
-                str(MotionCharacteristic.COMMAND.value),
-                bytes.fromhex(command),
-                response=False,
-            )
-            return True
-        except Exception as e:
-            _LOGGER.warning("Could not execute command: %s", e)
-            return False
+        # Cancel any command still waiting for ready notification, assume the connection is ready
+        if (
+            self._received_ready is not None
+            and not self._received_ready.done()
+            and not connection_command
+        ):
+            _LOGGER.warning("Cancel received ready, new command")
+            self._received_ready.set_result(False)
+        # Command must be generated just before sending due get_time timing
+        command = MotionCrypt.encrypt(command_prefix + MotionCrypt.get_time())
+        _LOGGER.warning("Sending message: %s", MotionCrypt.decrypt(command))
+        # response=False to solve Unlikely Error: [org.bluez.Error.Failed] Operation failed with ATT error: 0x0e (Unlikely Error)
+        # response=True: 0.20s, response=False: 0.0005s
+        a = time()
+        await self._current_bleak_client.write_gatt_char(
+            str(MotionCharacteristic.COMMAND.value),
+            bytes.fromhex(command),
+            response=True,
+        )
+        b = time()
+        _LOGGER.warning("Received response in %ss", str(b - a))
+        return True
 
     async def user_query(self) -> bool:
         """Send user_query command."""
         command_prefix = str(MotionCommandType.USER_QUERY.value)
-        return await self._send_command(command_prefix)
+        return await self._send_command(command_prefix, connection_command=True)
 
     async def set_key(self) -> bool:
         """Send set_key command."""
         command_prefix = str(MotionCommandType.SET_KEY.value)
-        return await self._send_command(command_prefix)
+        return await self._send_command(command_prefix, connection_command=True)
 
     async def status_query(self) -> bool:
         """Send status_query command."""
         command_prefix = str(MotionCommandType.STATUS_QUERY.value)
-        return await self._send_command(command_prefix)
+        return await self._send_command(command_prefix, connection_command=True)
 
     async def point_set_query(self) -> bool:
         """Send point_set_query command."""
         command_prefix = str(MotionCommandType.POINT_SET_QUERY.value)
-        return await self._send_command(command_prefix)
+        return await self._send_command(command_prefix, connection_command=True)
 
     async def percentage(self, percentage: int) -> bool:
         """Moves the device to a specific percentage."""

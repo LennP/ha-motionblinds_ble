@@ -64,7 +64,7 @@ class SpeedSelect(SelectEntity):
         self._attr_current_option = str(speed_level.value)
         self.async_write_ha_state()
 
-    async def async_select_option(self, speed_level: str) -> None:
+    async def async_select_option(self, option: str) -> None:
         """Change the selected speed_level."""
-        await self._blind.async_speed(MotionSpeedLevel(int(speed_level)))
+        await self._blind.async_speed(MotionSpeedLevel(int(option)))
         self.async_write_ha_state()
