@@ -32,6 +32,7 @@ from .const import (
     CONF_BLIND_TYPE,
     CONF_MAC_CODE,
     DOMAIN,
+    MANUFACTURER,
     SETTING_DOUBLE_CLICK_TIME,
     MotionBlindType,
     MotionRunningType,
@@ -51,21 +52,16 @@ async def async_setup_entry(
     blind = None
     if entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION:
         blind = PositionBlind(entry)
+    elif entry.data[CONF_BLIND_TYPE] == MotionBlindType.TILT:
+        blind = TiltBlind(entry)
     else:
         blind = PositionTiltBlind(entry)
     hass.data[DOMAIN][entry.entry_id] = blind
     async_add_entities([blind])
 
 
-class PositionBlind(CoverEntity):
-    """Representation of a blind with position capability."""
-
-    _attr_supported_features: [CoverEntityFeature] = (
-        CoverEntityFeature.OPEN
-        | CoverEntityFeature.CLOSE
-        | CoverEntityFeature.STOP
-        | CoverEntityFeature.SET_POSITION
-    )
+class GenericBlind(CoverEntity):
+    """Representation of a blind."""
 
     _device: MotionDevice = None
     _device_address: str = None
@@ -88,14 +84,13 @@ class PositionBlind(CoverEntity):
         self._attr_device_class: CoverDeviceClass = CoverDeviceClass.BLIND
         self._attr_device_info: DeviceInfo = DeviceInfo(
             identifiers={(DOMAIN, entry.data[CONF_MAC_CODE])},
-            manufacturer="MotionBlinds",
+            manufacturer=MANUFACTURER,
             name=self._attr_name,
         )
         self._attr_is_closed: bool = None
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
-        _LOGGER.info("Blind has been added!")
         try:
             ble_device = async_ble_device_from_address(self.hass, self._device_address)
             self._device = MotionDevice(self._device_address, ble_device)
@@ -116,9 +111,8 @@ class PositionBlind(CoverEntity):
             self._device.set_ha_call_later(partial(async_call_later, hass=self.hass))
             self.hass.data[DOMAIN][self.entity_id] = self
             # Register callbacks
-            # self._device.register_get_ble_device_callback(self.async_get_ble_device)
-            self._device.register_position_callback(self.async_update_position)
             self._device.register_running_callback(self.async_update_running)
+            self._device.register_position_callback(self.async_update_position)
             self._device.register_connection_callback(self.async_set_connection)
             self._device.register_status_callback(self.async_update_status)
         except Exception as e:
@@ -154,26 +148,6 @@ class PositionBlind(CoverEntity):
             if not await self._device.status_query():
                 self._allow_position_feedback = False
 
-    async def async_open_cover(self, **kwargs: any) -> None:
-        """Open the blind."""
-        _LOGGER.info("Open %s", self._device_address)
-        self.async_update_running(MotionRunningType.OPENING)
-        if await self._device.open():
-            self.async_refresh_disconnect_timer()
-            self.async_write_ha_state()
-        else:
-            self.async_update_running(MotionRunningType.STILL)
-
-    async def async_close_cover(self, **kwargs: any) -> None:
-        """Close the blind."""
-        _LOGGER.info("Close %s", self._device_address)
-        self.async_update_running(MotionRunningType.CLOSING)
-        if await self._device.close():
-            self.async_refresh_disconnect_timer()
-            self.async_write_ha_state()
-        else:
-            self.async_update_running(MotionRunningType.STILL)
-
     async def async_stop_cover(self, **kwargs: any) -> None:
         """Stop moving the blind."""
         current_stop_click_time = time.time_ns() // 1e6
@@ -207,24 +181,22 @@ class PositionBlind(CoverEntity):
         if await self._device.speed(speed_level):
             self.async_refresh_disconnect_timer()
 
-    async def async_set_cover_position(self, **kwargs: any) -> None:
-        """Move the blind to a specific position."""
-        new_position = 100 - kwargs.get(ATTR_POSITION)
-
-        _LOGGER.info("Set position to %s %s", str(new_position), self._device_address)
-        self.async_update_running(
-            MotionRunningType.STILL
-            if self._attr_current_cover_position is None
-            or new_position == 100 - self._attr_current_cover_position
-            else MotionRunningType.OPENING
-            if new_position < 100 - self._attr_current_cover_position
-            else MotionRunningType.CLOSING
+    @callback
+    def async_update_running(self, running_type: MotionRunningType) -> None:
+        """Callback used to update whether the blind is running (opening/closing) or not."""
+        self._attr_is_opening = (
+            False
+            if running_type == MotionRunningType.STILL
+            else running_type == MotionRunningType.OPENING
         )
-        if await self._device.percentage(new_position):
-            self.async_refresh_disconnect_timer()
-            self.async_write_ha_state()
-        else:
-            self.async_update_running(MotionRunningType.STILL)
+        self._attr_is_closing = (
+            False
+            if running_type == MotionRunningType.STILL
+            else running_type != MotionRunningType.OPENING
+        )
+        if running_type != MotionRunningType.STILL:
+            self._attr_is_closed = None
+        self.async_write_ha_state()
 
     @callback
     def async_update_position(
@@ -244,23 +216,6 @@ class PositionBlind(CoverEntity):
         self.async_write_ha_state()
 
     @callback
-    def async_update_running(self, running_type: MotionRunningType) -> None:
-        """Callback used to update whether the blind is running (opening/closing) or not."""
-        self._attr_is_opening = (
-            False
-            if running_type == MotionRunningType.STILL
-            else running_type == MotionRunningType.OPENING
-        )
-        self._attr_is_closing = (
-            False
-            if running_type == MotionRunningType.STILL
-            else running_type != MotionRunningType.OPENING
-        )
-        if running_type != MotionRunningType.STILL:
-            self._attr_is_closed = None
-        self.async_write_ha_state()
-
-    @callback
     def async_set_connection(self, connection_type: MotionConnectionType) -> None:
         """Callback used to update the connection status."""
         self._attr_connection_type = connection_type
@@ -275,7 +230,11 @@ class PositionBlind(CoverEntity):
 
     @callback
     def async_update_status(
-        self, position_percentage: int, tilt_percentage: int, battery_percentage: int, speed_level: MotionSpeedLevel
+        self,
+        position_percentage: int,
+        tilt_percentage: int,
+        battery_percentage: int,
+        speed_level: MotionSpeedLevel,
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
         # Only update position based on feedback when necessary, otherwise cover UI will jump around
@@ -316,19 +275,75 @@ class PositionBlind(CoverEntity):
         return {ATTR_CONNECTION_TYPE: self._attr_connection_type}
 
 
-class PositionTiltBlind(PositionBlind):
-    """Representation of a blind with position & tilt capabilities."""
+class PositionBlind(GenericBlind):
+    """Representation of a blind with position capability."""
 
     _attr_supported_features: [CoverEntityFeature] = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
         | CoverEntityFeature.STOP
         | CoverEntityFeature.SET_POSITION
-        | CoverEntityFeature.OPEN_TILT
+    )
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added."""
+        _LOGGER.info("PositionBlind has been added!")
+        await super().async_added_to_hass()
+
+    async def async_open_cover(self, **kwargs: any) -> None:
+        """Open the blind."""
+        _LOGGER.info("Open %s", self._device_address)
+        self.async_update_running(MotionRunningType.OPENING)
+        if await self._device.open():
+            self.async_refresh_disconnect_timer()
+            self.async_write_ha_state()
+        else:
+            self.async_update_running(MotionRunningType.STILL)
+
+    async def async_close_cover(self, **kwargs: any) -> None:
+        """Close the blind."""
+        _LOGGER.info("Close %s", self._device_address)
+        self.async_update_running(MotionRunningType.CLOSING)
+        if await self._device.close():
+            self.async_refresh_disconnect_timer()
+            self.async_write_ha_state()
+        else:
+            self.async_update_running(MotionRunningType.STILL)
+
+    async def async_set_cover_position(self, **kwargs: any) -> None:
+        """Move the blind to a specific position."""
+        new_position = 100 - kwargs.get(ATTR_POSITION)
+
+        _LOGGER.info("Set position to %s %s", str(new_position), self._device_address)
+        self.async_update_running(
+            MotionRunningType.STILL
+            if self._attr_current_cover_position is None
+            or new_position == 100 - self._attr_current_cover_position
+            else MotionRunningType.OPENING
+            if new_position < 100 - self._attr_current_cover_position
+            else MotionRunningType.CLOSING
+        )
+        if await self._device.percentage(new_position):
+            self.async_refresh_disconnect_timer()
+            self.async_write_ha_state()
+        else:
+            self.async_update_running(MotionRunningType.STILL)
+
+
+class TiltBlind(GenericBlind):
+    """Representation of a blind with tilt capability."""
+
+    _attr_supported_features: [CoverEntityFeature] = (
+        CoverEntityFeature.OPEN_TILT
         | CoverEntityFeature.CLOSE_TILT
         | CoverEntityFeature.STOP_TILT
         | CoverEntityFeature.SET_TILT_POSITION
     )
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added."""
+        _LOGGER.info("TiltBlind has been added!")
+        await super().async_added_to_hass()
 
     async def async_open_cover_tilt(self, **kwargs: any) -> None:
         """Tilt the blind open."""
@@ -352,7 +367,7 @@ class PositionTiltBlind(PositionBlind):
 
     async def async_stop_cover_tilt(self, **kwargs: any) -> None:
         """Stop tilting the blind."""
-        self.async_stop_cover(**kwargs)
+        await self.async_stop_cover(**kwargs)
 
     async def async_set_cover_tilt_position(self, **kwargs: any) -> None:
         """Tilt the blind to a specific position."""
@@ -374,3 +389,23 @@ class PositionTiltBlind(PositionBlind):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
+
+
+class PositionTiltBlind(PositionBlind, TiltBlind):
+    """Representation of a blind with position & tilt capabilities."""
+
+    _attr_supported_features: [CoverEntityFeature] = (
+        CoverEntityFeature.OPEN
+        | CoverEntityFeature.CLOSE
+        | CoverEntityFeature.STOP
+        | CoverEntityFeature.SET_POSITION
+        | CoverEntityFeature.OPEN_TILT
+        | CoverEntityFeature.CLOSE_TILT
+        | CoverEntityFeature.STOP_TILT
+        | CoverEntityFeature.SET_TILT_POSITION
+    )
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added."""
+        _LOGGER.info("PositionTiltBlind has been added!")
+        await super().async_added_to_hass()

@@ -71,6 +71,7 @@
         "title": "Blind Type",
         "options" : {
             "position": "Position",
+            "tilt": "Tilt",
             "position_tilt": "Position & Tilt"
         }
       }

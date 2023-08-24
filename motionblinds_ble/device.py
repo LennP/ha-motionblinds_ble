@@ -377,11 +377,6 @@ class MotionDevice:
         )
         return await self._send_command(command_prefix)
 
-    # async def stop_tilt(self) -> bool:
-    #     """Stops moving the device."""
-    #     command_prefix = str(MotionCommandType.STOP.value)
-    #     return await self._send_command(command_prefix)
-
     def register_position_callback(self, callback: Callable[[int, int], None]) -> None:
         """Register the callback used to update the position."""
         self._position_callback = callback

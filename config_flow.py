@@ -146,7 +146,6 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             raise InvalidMACCode()
 
         count = bluetooth.async_scanner_count(self.hass, connectable=True)
-        _LOGGER.warning(count)
         if count == 0:
             self.hass.async_create_task(
                 self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)

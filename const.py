@@ -22,6 +22,8 @@ ERROR_NO_DEVICES_FOUND = "no_devices_found"
 
 ICON_SPEED = "mdi:run-fast"
 
+MANUFACTURER = "MotionBlinds - Coulisse"
+
 SERVICE_CONNECT = "connect"
 SERVICE_DISCONNECT = "disconnect"
 SERVICE_FAVORITE = "favorite"
@@ -32,6 +34,7 @@ SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
 
 class MotionBlindType(StrEnum):
     POSITION = "position"
+    TILT = "tilt"
     POSITION_TILT = "position_tilt"
 
 
