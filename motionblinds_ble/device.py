@@ -1,13 +1,6 @@
 """Device for MotionBlinds BLE."""
 import logging
-from asyncio import (
-    CancelledError,
-    Task,
-    TimerHandle,
-    create_task,
-    get_event_loop,
-    Future,
-)
+from asyncio import CancelledError, Task, TimerHandle, create_task, get_event_loop
 from collections.abc import Callable, Coroutine
 from datetime import datetime
 from time import time_ns, time
@@ -55,8 +48,6 @@ class MotionDevice:
     # Used to ensure the first caller connects, but the last caller's command goes through when connecting
     _connection_task: Task = None
     _last_connection_caller_time: int = None
-    _received_ready: Future[bool] = None
-    _test_time = None
 
     def __init__(self, _address: str, _ble_device: BLEDevice = None) -> None:
         self._device_address = _address
@@ -175,14 +166,6 @@ class MotionDevice:
             self._status_callback(
                 position_percentage, angle_percentage, battery_percentage, speed_level
             )
-        elif (
-            decrypted_message.startswith(MotionNotificationType.READY.value)
-            and self._received_ready is not None
-            and not self._received_ready.done()
-        ):
-            if self._test_time is not None:
-                _LOGGER.warning("Received ready in %s", str(time() - self._test_time))
-            self._received_ready.set_result(True)
 
     def _disconnect_callback(self, client: BleakClient) -> None:
         """Callback called by Bleak when a client disconnects."""
@@ -227,6 +210,11 @@ class MotionDevice:
         try:
             if not await self._connection_task:
                 return False
+        except BleakOutOfConnectionSlotsError as e:
+            # Return False if connecting has been cancelled
+            _LOGGER.info("Cancelled connecting due to lack of connection slots")
+            self.set_connection(MotionConnectionType.DISCONNECTED)
+            raise e
         except CancelledError:
             # Return False if connecting has been cancelled
             _LOGGER.info("Cancelled connecting")
@@ -263,22 +251,12 @@ class MotionDevice:
             self._notification_callback,
         )
 
-        # Cancel any command still waiting for ready notification, assume the connection is ready
-        if self._received_ready is not None and not self._received_ready.done():
-            _LOGGER.warning("Cancel received ready, new connect")
-            self._received_ready.set_result(False)
-        self._received_ready = Future()
-
-        self._test_time = time()
         await self.set_key()
         await self.status_query()
 
         bleak_client.set_disconnected_callback(self._disconnect_callback)
 
-        # Wait for ready notification from motor before sending the first control command
-        # Sometimes using a proxy results in the device taking longer to be ready, meaning the first control command would be sent too early and not working
-        return await self._received_ready
-        # return True
+        return True
 
     def is_connected(self) -> bool:
         """Return whether or not the device is connected."""
@@ -293,14 +271,6 @@ class MotionDevice:
         """Write a message to the command characteristic, return whether or not the command was successfully executed."""
         if not await self.connect():
             return False
-        # Cancel any command still waiting for ready notification, assume the connection is ready
-        if (
-            self._received_ready is not None
-            and not self._received_ready.done()
-            and not connection_command
-        ):
-            _LOGGER.warning("Cancel received ready, new command")
-            self._received_ready.set_result(False)
         # Command must be generated just before sending due get_time timing
         command = MotionCrypt.encrypt(command_prefix + MotionCrypt.get_time())
         _LOGGER.warning("Sending message: %s", MotionCrypt.decrypt(command))
