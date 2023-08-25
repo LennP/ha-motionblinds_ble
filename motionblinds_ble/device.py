@@ -11,6 +11,8 @@ from bleak.exc import BleakError
 from bleak.backends.device import BLEDevice
 from bleak_retry_connector import establish_connection, BleakOutOfConnectionSlotsError
 
+from dataclasses import dataclass
+
 from .const import (
     SETTING_DISCONNECT_TIME,
     SETTING_MAX_COMMAND_ATTEMPTS,
@@ -25,6 +27,12 @@ from .const import (
 from .crypt import MotionCrypt
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class MotionPositionInfo:
+    UP: bool
+    DOWN: bool
 
 
 class MotionDevice:
@@ -161,11 +169,15 @@ class MotionDevice:
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
             battery_percentage: int = decrypted_message_bytes[17]
+            end_positions_byte = decrypted_message_bytes[4]
+            end_positions = MotionPositionInfo(
+                UP=bool(end_positions_byte & 0x08), DOWN=bool(end_positions_byte & 0x04)
+            )
             speed_level: MotionSpeedLevel = MotionSpeedLevel(
                 decrypted_message_bytes[12]
             )
             self._status_callback(
-                position_percentage, angle_percentage, battery_percentage, speed_level
+                position_percentage, angle_percentage, battery_percentage, speed_level, end_positions
             )
 
     def _disconnect_callback(self, client: BleakClient) -> None:
@@ -252,7 +264,10 @@ class MotionDevice:
             self._notification_callback,
         )
 
+        # Used to initialize
         await self.set_key()
+        # Set the point (used after calibrating Curtain)
+        # await self.point_set_query()
         await self.status_query()
 
         bleak_client.set_disconnected_callback(self._disconnect_callback)

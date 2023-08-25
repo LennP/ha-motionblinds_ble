@@ -2,14 +2,16 @@
 
 import logging
 
-from homeassistant.components.select import SelectEntity, SelectEntityDescription
+from homeassistant.components.select import (SelectEntity,
+                                             SelectEntityDescription)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import ATTR_SPEED, DOMAIN, ICON_SPEED
-from .cover import PositionBlind
+from .const import (ATTR_SPEED, CONF_BLIND_TYPE, DOMAIN, ICON_SPEED,
+                    MotionBlindType)
+from .cover import GenericBlind
 from .motionblinds_ble.const import MotionSpeedLevel
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,15 +34,16 @@ async def async_setup_entry(
 ) -> None:
     """Set up speed select entities based on a config entry."""
     _LOGGER.info("Setting up SpeedSelect")
-    blind: PositionBlind = hass.data[DOMAIN][entry.entry_id]
+    blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities([SpeedSelect(blind)])
+    if blind.config_entry.data[CONF_BLIND_TYPE] != MotionBlindType.POSITION_CURTAIN:
+        async_add_entities([SpeedSelect(blind)])
 
 
 class SpeedSelect(SelectEntity):
     """Representation of a speed select entity."""
 
-    def __init__(self, blind: PositionBlind) -> None:
+    def __init__(self, blind: GenericBlind) -> None:
         """Initialize the speed select entity."""
         self.entity_description = SELECT_TYPES[ATTR_SPEED]
         self._blind = blind
@@ -50,7 +53,9 @@ class SpeedSelect(SelectEntity):
         self._attr_device_info = blind.device_info
         self._attr_current_option: str = None
         self._attr_options: [str] = [
-            str(speed_level.value) for speed_level in MotionSpeedLevel
+            str(speed_level.value)
+            for speed_level in MotionSpeedLevel
+            if speed_level is not MotionSpeedLevel.NONE
         ]
 
     async def async_added_to_hass(self) -> None:

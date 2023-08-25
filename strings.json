@@ -72,7 +72,8 @@
         "options" : {
             "position": "Position",
             "tilt": "Tilt",
-            "position_tilt": "Position & Tilt"
+            "position_tilt": "Position & Tilt",
+            "position_curtain": "Curtain"
         }
       }
     },

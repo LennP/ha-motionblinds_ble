@@ -2,6 +2,7 @@
 
 from enum import StrEnum
 
+ATTR_CALIBRATION = "calibration"
 ATTR_CONNECTION_TIMEOUT = "connection_timeout"
 ATTR_CONNECTION_TYPE = "connection_type"
 ATTR_SPEED = "speed"
@@ -20,6 +21,7 @@ ERROR_INVALID_MAC_CODE = "invalid_mac_code"
 ERROR_NO_BLUETOOTH_ADAPTER = "no_bluetooth_adapter"
 ERROR_NO_DEVICES_FOUND = "no_devices_found"
 
+ICON_CALIBRATION = "mdi:tune"
 ICON_SPEED = "mdi:run-fast"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
@@ -36,6 +38,7 @@ class MotionBlindType(StrEnum):
     POSITION = "position"
     TILT = "tilt"
     POSITION_TILT = "position_tilt"
+    POSITION_CURTAIN = "position_curtain"
 
 
 class MotionRunningType(StrEnum):

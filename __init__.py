@@ -22,7 +22,7 @@ from .const import (
     SERVICE_FAVORITE,
     SERVICE_STATUS,
 )
-from .cover import PositionBlind
+from .cover import GenericBlind
 from .motionblinds_ble.crypt import MotionCrypt
 
 PLATFORMS: list[Platform] = [Platform.COVER, Platform.SENSOR, Platform.SELECT]
@@ -58,11 +58,11 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     MotionCrypt.set_timezone(hass.config.time_zone)
 
     def generic_entity_service(
-        callback: Callable[[PositionBlind], None]
+        callback: Callable[[GenericBlind], None]
     ) -> Callable[[ServiceCall], None]:
         async def service_func(call: ServiceCall) -> None:
             for motionblind_entity_id in call.data[ATTR_ENTITY_ID]:
-                motionblind_entity: PositionBlind = hass.data[DOMAIN].get(
+                motionblind_entity: GenericBlind = hass.data[DOMAIN].get(
                     motionblind_entity_id
                 )
                 if motionblind_entity:
@@ -72,19 +72,19 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
 
     _LOGGER.warning("Registering services")
 
-    async def connect_service(blind: PositionBlind, call: ServiceCall) -> None:
+    async def connect_service(blind: GenericBlind, call: ServiceCall) -> None:
         if await blind.async_connect():
             blind.async_refresh_disconnect_timer(
                 timeout=call.data[ATTR_CONNECTION_TIMEOUT], force=True
             )
 
-    async def disconnect_service(blind: PositionBlind, call: ServiceCall) -> None:
+    async def disconnect_service(blind: GenericBlind, call: ServiceCall) -> None:
         await blind.async_disconnect()
 
-    async def favorite_service(blind: PositionBlind, call: ServiceCall) -> None:
+    async def favorite_service(blind: GenericBlind, call: ServiceCall) -> None:
         await blind.async_favorite()
 
-    async def status_service(blind: PositionBlind, call: ServiceCall) -> None:
+    async def status_service(blind: GenericBlind, call: ServiceCall) -> None:
         await blind.async_status_query()
 
     services = [
@@ -129,7 +129,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, [Platform.COVER])
     await hass.config_entries.async_forward_entry_setups(
-        entry, [Platform.SENSOR, Platform.SELECT]
+        entry, [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SELECT]
     )
 
     _LOGGER.info("Fully loaded entity")

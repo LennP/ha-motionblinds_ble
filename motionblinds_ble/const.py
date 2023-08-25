@@ -50,6 +50,7 @@ class MotionRunningType(StrEnum):
 
 
 class MotionSpeedLevel(IntEnum):
-    LOW = 0x01
-    MEDIUM = 0x02
-    HIGH = 0x03
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+    NONE = 50

@@ -14,7 +14,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
 from .const import DOMAIN, ATTR_BATTERY
-from .cover import PositionBlind
+from .cover import GenericBlind
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,7 +37,7 @@ async def async_setup_entry(
 ) -> None:
     """Set up battery sensors based on a config entry."""
     _LOGGER.info("Setting up BatterySensor")
-    blind: PositionBlind = hass.data[DOMAIN][entry.entry_id]
+    blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
     async_add_entities([BatterySensor(blind)])
 
@@ -45,7 +45,7 @@ async def async_setup_entry(
 class BatterySensor(SensorEntity):
     """Representation of a battery sensor."""
 
-    def __init__(self, blind: PositionBlind) -> None:
+    def __init__(self, blind: GenericBlind) -> None:
         """Initialize the battery sensor."""
         self.entity_description = SENSOR_TYPES[ATTR_BATTERY]
         self._blind = blind

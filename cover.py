@@ -38,7 +38,7 @@ from .const import (
     MotionRunningType,
 )
 from .motionblinds_ble.const import MotionConnectionType, MotionSpeedLevel
-from .motionblinds_ble.device import MotionDevice
+from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -50,7 +50,10 @@ async def async_setup_entry(
     _LOGGER.info("Setting up cover with data %s", entry.data)
 
     blind = None
-    if entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION:
+    if (
+        entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION
+        or entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION_CURTAIN
+    ):
         blind = PositionBlind(entry)
     elif entry.data[CONF_BLIND_TYPE] == MotionBlindType.TILT:
         blind = TiltBlind(entry)
@@ -73,11 +76,12 @@ class GenericBlind(CoverEntity):
 
     _battery_callback: Callable[[int], None] = None
     _speed_callback: Callable[[MotionSpeedLevel], None] = None
+    _calibrated_callback: Callable[[bool], None] = None
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the blind."""
         super().__init__()
-        self._config_entry: ConfigEntry = entry
+        self.config_entry: ConfigEntry = entry
         self._device_address: str = entry.data[CONF_ADDRESS]
         self._attr_name: str = f"MotionBlind {entry.data[CONF_MAC_CODE]}"
         self._attr_unique_id: str = entry.data[CONF_ADDRESS]
@@ -102,7 +106,7 @@ class GenericBlind(CoverEntity):
         # Pass functions used to schedule tasks
         self._device.set_ha_create_task(
             partial(
-                self._config_entry.async_create_task,
+                self.config_entry.async_create_task,
                 hass=self.hass,
                 name=self._device_address,
             )
@@ -228,6 +232,7 @@ class GenericBlind(CoverEntity):
         tilt_percentage: int,
         battery_percentage: int,
         speed_level: MotionSpeedLevel,
+        end_position_info: MotionPositionInfo,
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
         # Only update position based on feedback when necessary, otherwise cover UI will jump around
@@ -239,8 +244,17 @@ class GenericBlind(CoverEntity):
 
         if self._battery_callback is not None:
             self._battery_callback(battery_percentage)
-        if self._speed_callback is not None:
+        if (
+            self._speed_callback is not None
+            and speed_level is not MotionSpeedLevel.NONE
+        ):
             self._speed_callback(speed_level)
+        if (
+            self._calibrated_callback is not None
+            and speed_level is MotionSpeedLevel.NONE
+        ):
+            _LOGGER.info("Calibrated: %s", end_position_info.UP)
+            self._calibrated_callback(end_position_info)
         self.async_write_ha_state()
 
     @callback
@@ -261,6 +275,12 @@ class GenericBlind(CoverEntity):
     ) -> None:
         """Register the callback used to update the speed level."""
         self._speed_callback = _speed_callback
+
+    def async_register_calibrated_callback(
+        self, _calibrated_callback: Callable[[bool], None]
+    ) -> None:
+        """Register the callback used to update the calibration."""
+        self._calibrated_callback = _calibrated_callback
 
     @property
     def extra_state_attributes(self) -> Mapping[str, str]:
