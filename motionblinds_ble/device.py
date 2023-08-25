@@ -13,6 +13,7 @@ from bleak_retry_connector import establish_connection, BleakOutOfConnectionSlot
 
 from .const import (
     SETTING_DISCONNECT_TIME,
+    SETTING_MAX_COMMAND_ATTEMPTS,
     SETTING_MAX_CONNECT_ATTEMPTS,
     MotionCharacteristic,
     MotionCommandType,
@@ -276,15 +277,26 @@ class MotionDevice:
         _LOGGER.warning("Sending message: %s", MotionCrypt.decrypt(command))
         # response=False to solve Unlikely Error: [org.bluez.Error.Failed] Operation failed with ATT error: 0x0e (Unlikely Error)
         # response=True: 0.20s, response=False: 0.0005s
-        a = time()
-        await self._current_bleak_client.write_gatt_char(
-            str(MotionCharacteristic.COMMAND.value),
-            bytes.fromhex(command),
-            response=True,
-        )
-        b = time()
-        _LOGGER.warning("Received response in %ss", str(b - a))
-        return True
+        number_of_tries = 0
+        while number_of_tries < SETTING_MAX_COMMAND_ATTEMPTS:
+            try:
+                a = time()
+                await self._current_bleak_client.write_gatt_char(
+                    str(MotionCharacteristic.COMMAND.value),
+                    bytes.fromhex(command),
+                    response=True,
+                )
+                b = time()
+                _LOGGER.warning("Received response in %ss", str(b - a))
+                return True
+            except BleakError as e:
+                if number_of_tries == SETTING_MAX_COMMAND_ATTEMPTS:
+                    raise e
+                else:
+                    _LOGGER.warning(
+                        "Error sending message (try %i): %s", number_of_tries, e
+                    )
+                    number_of_tries += 1
 
     async def user_query(self) -> bool:
         """Send user_query command."""
