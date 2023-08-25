@@ -7,6 +7,9 @@ ATTR_CONNECTION_TIMEOUT = "connection_timeout"
 ATTR_CONNECTION_TYPE = "connection_type"
 ATTR_SPEED = "speed"
 ATTR_BATTERY = "battery"
+ATTR_CONNECT = "connect"
+ATTR_DISCONNECT = "disconnect"
+ATTR_FAVORITE = "favorite"
 
 CONF_LOCAL_NAME = "local_name"
 CONF_ADDRESS = "address"
@@ -23,6 +26,9 @@ ERROR_NO_DEVICES_FOUND = "no_devices_found"
 
 ICON_CALIBRATION = "mdi:tune"
 ICON_SPEED = "mdi:run-fast"
+ICON_CONNECT = "mdi:bluetooth"
+ICON_DISCONNECT = "mdi:bluetooth-off"
+ICON_FAVORITE = "mdi:star"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
 

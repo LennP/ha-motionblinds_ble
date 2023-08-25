@@ -129,7 +129,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     await hass.config_entries.async_forward_entry_setups(entry, [Platform.COVER])
     await hass.config_entries.async_forward_entry_setups(
-        entry, [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SELECT]
+        entry,
+        [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SELECT, Platform.BUTTON],
     )
 
     _LOGGER.info("Fully loaded entity")
