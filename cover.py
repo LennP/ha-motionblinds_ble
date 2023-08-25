@@ -77,6 +77,7 @@ class GenericBlind(CoverEntity):
     _battery_callback: Callable[[int], None] = None
     _speed_callback: Callable[[MotionSpeedLevel], None] = None
     _calibrated_callback: Callable[[bool], None] = None
+    _connection_callback: Callable[[MotionConnectionType], None] = None
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the blind."""
@@ -216,6 +217,8 @@ class GenericBlind(CoverEntity):
     def async_set_connection(self, connection_type: MotionConnectionType) -> None:
         """Callback used to update the connection status."""
         self._attr_connection_type = connection_type
+        if self._connection_callback is not None:
+            self._connection_callback(connection_type)
         # Reset states if connection is lost, since we don't know the cover position anymore
         if not connection_type == MotionConnectionType.CONNECTED:
             self._attr_is_opening = False
@@ -281,6 +284,12 @@ class GenericBlind(CoverEntity):
     ) -> None:
         """Register the callback used to update the calibration."""
         self._calibrated_callback = _calibrated_callback
+
+    def async_register_connection_callback(
+        self, _connection_callback: Callable[[MotionConnectionType], None]
+    ) -> None:
+        """Register the callback used to update the connection."""
+        self._connection_callback = _connection_callback
 
     @property
     def extra_state_attributes(self) -> Mapping[str, str]:

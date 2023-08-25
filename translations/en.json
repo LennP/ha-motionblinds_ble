@@ -94,11 +94,21 @@
         },
         "select": {
             "speed": {
-                "name": "test",
+                "name": "Motor speed",
                 "state": {
                     "1": "Low",
                     "2": "Medium",
                     "3": "High"
+                }
+            }
+        },
+        "sensor": {
+            "connection_type": {
+                "name": "Connected",
+                "state": {
+                    "connected": "Yes",
+                    "disconnected": "No",
+                    "connecting": "Connecting..."
                 }
             }
         }

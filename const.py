@@ -29,6 +29,7 @@ ICON_SPEED = "mdi:run-fast"
 ICON_CONNECT = "mdi:bluetooth"
 ICON_DISCONNECT = "mdi:bluetooth-off"
 ICON_FAVORITE = "mdi:star"
+ICON_CONNECTION_TYPE = "mdi:bluetooth-connect"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
 
