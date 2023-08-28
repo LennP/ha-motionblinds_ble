@@ -4,6 +4,7 @@ from enum import IntEnum, StrEnum
 SETTING_MAX_CONNECT_ATTEMPTS = 5
 SETTING_MAX_COMMAND_ATTEMPTS = 5
 SETTING_DISCONNECT_TIME = 15  # Seconds
+SETTING_CALIBRATION_DISCONNECT_TIME = 45  # Seconds
 
 
 class MotionService(StrEnum):

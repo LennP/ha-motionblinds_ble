@@ -31,6 +31,10 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class MotionPositionInfo:
+    def __init__(self, end_positions_byte: int) -> None:
+        self.UP = bool(end_positions_byte & 0x08)
+        self.DOWN = bool(end_positions_byte & 0x04)
+
     UP: bool
     DOWN: bool
 
@@ -148,10 +152,15 @@ class MotionDevice:
             and self._position_callback is not None
         ):
             _LOGGER.info("Position notification")
+            end_position_info: MotionPositionInfo = MotionPositionInfo(
+                decrypted_message_bytes[4]
+            )
             position_percentage: int = decrypted_message_bytes[6]
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
-            self._position_callback(position_percentage, angle_percentage)
+            self._position_callback(
+                position_percentage, angle_percentage, end_position_info
+            )
         elif (
             decrypted_message.startswith(MotionNotificationType.RUNNING.value)
             and self._running_callback is not None
@@ -169,15 +178,16 @@ class MotionDevice:
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
             battery_percentage: int = decrypted_message_bytes[17]
-            end_positions_byte = decrypted_message_bytes[4]
-            end_positions = MotionPositionInfo(
-                UP=bool(end_positions_byte & 0x08), DOWN=bool(end_positions_byte & 0x04)
-            )
+            end_position_info = MotionPositionInfo(decrypted_message_bytes[4])
             speed_level: MotionSpeedLevel = MotionSpeedLevel(
                 decrypted_message_bytes[12]
             )
             self._status_callback(
-                position_percentage, angle_percentage, battery_percentage, speed_level, end_positions
+                position_percentage,
+                angle_percentage,
+                battery_percentage,
+                speed_level,
+                end_position_info,
             )
 
     def _disconnect_callback(self, client: BleakClient) -> None:
@@ -235,9 +245,12 @@ class MotionDevice:
             return False
 
         self._connection_task = None
-        return (
+        is_last_caller = (
             self._last_connection_caller_time == this_connection_caller_time
-        )  # Return whether or not this function was the last caller
+        )
+        if is_last_caller:
+            self.refresh_disconnect_timer()
+        return is_last_caller  # Return whether or not this function was the last caller
 
     async def _connect(self) -> bool:
         """Connect to the device, return whether or not the motor is ready for a command."""

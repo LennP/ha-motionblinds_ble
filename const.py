@@ -52,3 +52,10 @@ class MotionRunningType(StrEnum):
     CLOSING = "closing"
     OPENING = "opening"
     STILL = "still"
+    UNKNOWN = "unknown"
+
+
+class MotionCalibrationType(StrEnum):
+    CALIBRATED = "calibrated"
+    UNCALIBRATED = "uncalibrated"
+    CALIBRATING = "calibrating"

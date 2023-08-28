@@ -92,6 +92,17 @@
                 }
             }
         },
+        "button": {
+            "connect": {
+                "name": "Connect"
+            },
+            "disconnect": {
+                "name": "Disconnect"
+            },
+            "favorite": {
+                "name": "Favorite"
+            }
+        },
         "select": {
             "speed": {
                 "name": "Motor speed",
@@ -103,12 +114,23 @@
             }
         },
         "sensor": {
+            "battery": {
+                "name": "Battery"
+            },
             "connection_type": {
                 "name": "Connected",
                 "state": {
                     "connected": "Yes",
                     "disconnected": "No",
                     "connecting": "Connecting..."
+                }
+            },
+            "calibration": {
+                "name": "Calibrated",
+                "state": {
+                    "calibrated": "Yes",
+                    "uncalibrated": "No",
+                    "calibrating": "Calibrating..."
                 }
             }
         }

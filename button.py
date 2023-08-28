@@ -32,8 +32,6 @@ PARALLEL_UPDATES = 0
 @dataclass
 class CommandButtonEntityDescription(ButtonEntityDescription):
     command_callback: Callable[[GenericBlind], None] | None = None
-    name_postfix: str | None = None
-    unique_id_postfix: str | None = None
 
 
 async def command_connect(blind: GenericBlind) -> None:
@@ -54,27 +52,24 @@ BUTTON_TYPES: dict[str, CommandButtonEntityDescription] = {
         translation_key=ATTR_CONNECT,
         icon=ICON_CONNECT,
         entity_category=EntityCategory.CONFIG,
+        has_entity_name=True,
         command_callback=command_connect,
-        name_postfix="Connect",
-        unique_id_postfix="connect",
     ),
     ATTR_DISCONNECT: CommandButtonEntityDescription(
         key=ATTR_DISCONNECT,
         translation_key=ATTR_DISCONNECT,
         icon=ICON_DISCONNECT,
         entity_category=EntityCategory.CONFIG,
+        has_entity_name=True,
         command_callback=command_disconnect,
-        name_postfix="Disconnect",
-        unique_id_postfix="disconnect",
     ),
     ATTR_FAVORITE: CommandButtonEntityDescription(
         key=ATTR_FAVORITE,
         translation_key=ATTR_FAVORITE,
         icon=ICON_FAVORITE,
         entity_category=EntityCategory.CONFIG,
+        has_entity_name=True,
         command_callback=command_favorite,
-        name_postfix="Favorite position",
-        unique_id_postfix="favorite",
     ),
 }
 
@@ -101,13 +96,10 @@ class GenericCommandButton(ButtonEntity):
         self, blind: GenericBlind, entity_description: CommandButtonEntityDescription
     ) -> None:
         """Initialize the command button."""
-        _LOGGER.info(f"Setting up {entity_description.name_postfix} button")
+        _LOGGER.info(f"Setting up {entity_description.key} button")
         self.entity_description = entity_description
         self._blind = blind
-        self._attr_name = f"{blind.name} {entity_description.name_postfix}"
-        self._attr_unique_id = (
-            f"{blind.unique_id}_{entity_description.unique_id_postfix.lower()}"
-        )
+        self._attr_unique_id = f"{blind.unique_id}_{entity_description.key}"
         self._attr_device_info = blind.device_info
 
     async def async_press(self) -> None:

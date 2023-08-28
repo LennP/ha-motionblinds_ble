@@ -36,8 +36,13 @@ from .const import (
     SETTING_DOUBLE_CLICK_TIME,
     MotionBlindType,
     MotionRunningType,
+    MotionCalibrationType,
 )
-from .motionblinds_ble.const import MotionConnectionType, MotionSpeedLevel
+from .motionblinds_ble.const import (
+    MotionConnectionType,
+    MotionSpeedLevel,
+    SETTING_CALIBRATION_DISCONNECT_TIME,
+)
 from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -50,11 +55,10 @@ async def async_setup_entry(
     _LOGGER.info("Setting up cover with data %s", entry.data)
 
     blind = None
-    if (
-        entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION
-        or entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION_CURTAIN
-    ):
+    if entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION:
         blind = PositionBlind(entry)
+    elif entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION_CURTAIN:
+        blind = PositionCurtainBlind(entry)
     elif entry.data[CONF_BLIND_TYPE] == MotionBlindType.TILT:
         blind = TiltBlind(entry)
     else:
@@ -76,7 +80,6 @@ class GenericBlind(CoverEntity):
 
     _battery_callback: Callable[[int], None] = None
     _speed_callback: Callable[[MotionSpeedLevel], None] = None
-    _calibrated_callback: Callable[[bool], None] = None
     _connection_callback: Callable[[MotionConnectionType], None] = None
 
     def __init__(self, entry: ConfigEntry) -> None:
@@ -117,7 +120,7 @@ class GenericBlind(CoverEntity):
         # Register callbacks
         self._device.register_running_callback(self.async_update_running)
         self._device.register_position_callback(self.async_update_position)
-        self._device.register_connection_callback(self.async_set_connection)
+        self._device.register_connection_callback(self.async_update_connection)
         self._device.register_status_callback(self.async_update_status)
         await super().async_added_to_hass()
 
@@ -169,6 +172,7 @@ class GenericBlind(CoverEntity):
 
     async def async_favorite(self, **kwargs: any) -> None:
         """Move the blind to the favorite position."""
+        self.async_update_running(MotionRunningType.UNKNOWN)
         _LOGGER.info("Favorite %s", self._device_address)
         if await self._device.favorite():
             self.async_refresh_disconnect_timer()
@@ -179,7 +183,6 @@ class GenericBlind(CoverEntity):
         if await self._device.speed(speed_level):
             self.async_refresh_disconnect_timer()
 
-    @callback
     def async_update_running(self, running_type: MotionRunningType) -> None:
         """Callback used to update whether the blind is running (opening/closing) or not."""
         self._attr_is_opening = (
@@ -198,7 +201,10 @@ class GenericBlind(CoverEntity):
 
     @callback
     def async_update_position(
-        self, new_position_percentage: int, new_angle_percentage: int
+        self,
+        new_position_percentage: int,
+        new_angle_percentage: int,
+        end_position_info: MotionPositionInfo,
     ) -> None:
         """Callback used to update the position of the blind."""
         _LOGGER.info(
@@ -206,6 +212,8 @@ class GenericBlind(CoverEntity):
             str(new_position_percentage),
             str(new_angle_percentage),
         )
+        if isinstance(self, PositionCurtainBlind):
+            self.async_update_calibration(end_position_info)
         self._attr_current_cover_position = 100 - new_position_percentage
         self._attr_current_cover_tilt_position = 100 - new_angle_percentage
         self._attr_is_closed = self._attr_current_cover_position == 0
@@ -214,18 +222,22 @@ class GenericBlind(CoverEntity):
         self.async_write_ha_state()
 
     @callback
-    def async_set_connection(self, connection_type: MotionConnectionType) -> None:
+    def async_update_connection(self, connection_type: MotionConnectionType) -> None:
         """Callback used to update the connection status."""
         self._attr_connection_type = connection_type
         if self._connection_callback is not None:
             self._connection_callback(connection_type)
         # Reset states if connection is lost, since we don't know the cover position anymore
-        if not connection_type == MotionConnectionType.CONNECTED:
+        if connection_type is MotionConnectionType.DISCONNECTED:
             self._attr_is_opening = False
             self._attr_is_closing = False
             self._attr_is_closed = None
             self._attr_current_cover_position = None
             self._attr_current_cover_tilt_position = None
+            if self._speed_callback is not None:
+                self._speed_callback(None)
+            if self._battery_callback is not None:
+                self._battery_callback(None)
         self.async_write_ha_state()
 
     @callback
@@ -252,12 +264,8 @@ class GenericBlind(CoverEntity):
             and speed_level is not MotionSpeedLevel.NONE
         ):
             self._speed_callback(speed_level)
-        if (
-            self._calibrated_callback is not None
-            and speed_level is MotionSpeedLevel.NONE
-        ):
-            _LOGGER.info("Calibrated: %s", end_position_info.UP)
-            self._calibrated_callback(end_position_info)
+        if isinstance(self, PositionCurtainBlind):
+            self.async_update_calibration(end_position_info)
         self.async_write_ha_state()
 
     @callback
@@ -278,12 +286,6 @@ class GenericBlind(CoverEntity):
     ) -> None:
         """Register the callback used to update the speed level."""
         self._speed_callback = _speed_callback
-
-    def async_register_calibrated_callback(
-        self, _calibrated_callback: Callable[[bool], None]
-    ) -> None:
-        """Register the callback used to update the calibration."""
-        self._calibrated_callback = _calibrated_callback
 
     def async_register_connection_callback(
         self, _connection_callback: Callable[[MotionConnectionType], None]
@@ -431,3 +433,51 @@ class PositionTiltBlind(PositionBlind, TiltBlind):
         """Run when entity about to be added."""
         _LOGGER.info("PositionTiltBlind has been added!")
         await super().async_added_to_hass()
+
+
+class PositionCurtainBlind(PositionBlind):
+    """Representation of a curtain blind."""
+
+    _calibration_type: MotionCalibrationType = None
+    _calibration_callback: Callable[[MotionCalibrationType], None] = None
+
+    def async_update_running(self, running_type: MotionRunningType) -> None:
+        if running_type is not MotionRunningType.STILL:
+            # Motor will calibrate if not calibrated and moved to some position
+            _LOGGER.info("Starting calibration")
+            self._calibration_type = MotionCalibrationType.CALIBRATING
+            self._calibration_callback(MotionCalibrationType.CALIBRATING)
+            self.async_refresh_disconnect_timer(SETTING_CALIBRATION_DISCONNECT_TIME)
+        super().async_update_running(running_type)
+
+    def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
+        _LOGGER.info("Calibrated: %s", end_position_info.UP)
+        new_calibration_type = (
+            MotionCalibrationType.CALIBRATED
+            if end_position_info.UP
+            else MotionCalibrationType.UNCALIBRATED
+        )
+        if (
+            self._calibration_type is MotionCalibrationType.UNCALIBRATED
+            and new_calibration_type is MotionCalibrationType.CALIBRATED
+        ):
+            # Refresh disconnect timer to default value
+            self.async_refresh_disconnect_timer(force=True)
+        self._calibration_callback(new_calibration_type)
+        self._calibration_type = new_calibration_type
+
+    def async_register_calibration_callback(
+        self, _calibration_callback: Callable[[MotionCalibrationType], None]
+    ) -> None:
+        """Register the callback used to update the calibration."""
+        self._calibration_callback = _calibration_callback
+
+    @callback
+    def async_update_connection(self, connection_type: MotionConnectionType) -> None:
+        """Callback used to update the connection status."""
+        if (
+            self._calibration_callback is not None
+            and connection_type is MotionConnectionType.DISCONNECTED
+        ):
+            self._calibration_callback(None)
+        super().async_update_connection(connection_type)
