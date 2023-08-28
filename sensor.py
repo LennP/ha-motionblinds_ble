@@ -97,7 +97,9 @@ class BatterySensor(SensorEntity):
     @callback
     def async_update_battery_percentage(self, battery_percentage: int) -> None:
         """Update the battery percentage sensor value."""
-        self._attr_native_value = str(battery_percentage)
+        self._attr_native_value = (
+            str(battery_percentage) if battery_percentage else None
+        )
         self.async_write_ha_state()
 
 
