@@ -3,6 +3,7 @@
 import logging
 import time
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass, field
 from functools import partial
 
 from homeassistant.components.bluetooth import (
@@ -18,6 +19,7 @@ from homeassistant.components.cover import (
     ATTR_TILT_POSITION,
     CoverDeviceClass,
     CoverEntity,
+    CoverEntityDescription,
     CoverEntityFeature,
 )
 from homeassistant.config_entries import ConfigEntry
@@ -35,17 +37,34 @@ from .const import (
     MANUFACTURER,
     SETTING_DOUBLE_CLICK_TIME,
     MotionBlindType,
-    MotionRunningType,
     MotionCalibrationType,
+    MotionRunningType,
 )
 from .motionblinds_ble.const import (
+    SETTING_CALIBRATION_DISCONNECT_TIME,
     MotionConnectionType,
     MotionSpeedLevel,
-    SETTING_CALIBRATION_DISCONNECT_TIME,
 )
 from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class MotionCoverEntityDescription(CoverEntityDescription):
+    key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
+    translation_key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
+    device_class: CoverDeviceClass = field(default=CoverDeviceClass.BLIND, init=True)
+
+
+COVER_TYPES: dict[MotionBlindType, MotionCoverEntityDescription] = {
+    MotionBlindType.POSITION: MotionCoverEntityDescription(),
+    MotionBlindType.POSITION_CURTAIN: MotionCoverEntityDescription(
+        device_class=CoverDeviceClass.CURTAIN
+    ),
+    MotionBlindType.TILT: MotionCoverEntityDescription(),
+    MotionBlindType.POSITION_TILT: MotionCoverEntityDescription(),
+}
 
 
 async def async_setup_entry(
@@ -72,7 +91,6 @@ class GenericBlind(CoverEntity):
 
     _device: MotionDevice = None
     _device_address: str = None
-    _attr_translation_key: str = CoverDeviceClass.BLIND.value
     _attr_connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
 
     _last_stop_click_time: int = None
@@ -85,11 +103,13 @@ class GenericBlind(CoverEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the blind."""
         super().__init__()
+        self.entity_description = COVER_TYPES[
+            MotionBlindType(entry.data[CONF_BLIND_TYPE])
+        ]
         self.config_entry: ConfigEntry = entry
         self._device_address: str = entry.data[CONF_ADDRESS]
         self._attr_name: str = f"MotionBlind {entry.data[CONF_MAC_CODE]}"
         self._attr_unique_id: str = entry.data[CONF_ADDRESS]
-        self._attr_device_class: CoverDeviceClass = CoverDeviceClass.BLIND
         self._attr_device_info: DeviceInfo = DeviceInfo(
             identifiers={(DOMAIN, entry.data[CONF_MAC_CODE])},
             manufacturer=MANUFACTURER,
@@ -484,5 +504,6 @@ class PositionCurtainBlind(PositionBlind):
             self._calibration_callback is not None
             and connection_type is MotionConnectionType.DISCONNECTED
         ):
+            # Set calibration to None if disconnected
             self._calibration_callback(None)
         super().async_update_connection(connection_type)

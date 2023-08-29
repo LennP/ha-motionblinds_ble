@@ -30,6 +30,7 @@ ICON_CONNECT = "mdi:bluetooth"
 ICON_DISCONNECT = "mdi:bluetooth-off"
 ICON_FAVORITE = "mdi:star"
 ICON_CONNECTION_TYPE = "mdi:bluetooth-connect"
+ICON_CURTAIN = "mdi:curtains"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
 

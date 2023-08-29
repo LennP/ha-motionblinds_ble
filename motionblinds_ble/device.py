@@ -195,11 +195,13 @@ class MotionDevice:
         _LOGGER.info("Device %s disconnected!", self._device_address)
         self.set_connection(MotionConnectionType.DISCONNECTED)
 
-    async def connect(self) -> None:
+    async def connect(self) -> bool:
         """Connect to the device if not connected, return whether or not the motor is ready for a command."""
         if not self.is_connected():
             # Connect if not connected yet and not busy connecting
             return await self._connect_if_not_connecting()
+        else:
+            self.refresh_disconnect_timer()
         return True
 
     async def disconnect(self) -> None:
