@@ -12,7 +12,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.components.bluetooth import async_ble_device_from_address
 from homeassistant.components.bluetooth.wrappers import BLEDevice
 
 from .const import (
@@ -24,7 +23,7 @@ from .const import (
     DOMAIN,
     ICON_CALIBRATION,
     ICON_CONNECTION_TYPE,
-    MotionBlindType,
+    MotionBlindEntityType,
     MotionCalibrationType,
 )
 from .cover import GenericBlind, PositionCurtainBlind
@@ -85,7 +84,10 @@ async def async_setup_entry(
         ConnectionSensor(blind),
         SignalStrengthSensor(blind),
     ]
-    if blind.config_entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION_CURTAIN:
+    if (
+        blind.config_entry.data[CONF_BLIND_TYPE]
+        == MotionBlindEntityType.POSITION_CURTAIN
+    ):
         entities.append(CalibrationSensor(blind))
     async_add_entities(entities)
 

@@ -15,7 +15,7 @@
                 }
             },
             "confirm": {
-                "description": "What capabilities does {display_name} have?"
+                "description": "What kind of blind is {display_name}?"
             }
         }
     },
@@ -70,10 +70,14 @@
       "blind_type": {
         "title": "Blind Type",
         "options" : {
-            "position": "Position",
-            "tilt": "Tilt",
-            "position_tilt": "Position & Tilt",
-            "position_curtain": "Curtain"
+            "roller": "Roller blind",
+            "honeycomb": "Honeycomb blind",
+            "roman": "Roman blind",
+            "venetian": "Venetian blind",
+            "venetian_tilt_only": "Venetian blind (tilt-only)",
+            "double_roller": "Double Roller blind",
+            "curtain": "Curtain blind",
+            "vertical": "Vertical blind"
         }
       }
     },

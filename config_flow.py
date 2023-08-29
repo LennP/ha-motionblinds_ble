@@ -12,7 +12,11 @@ from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
 from homeassistant.components.bluetooth.wrappers import BLEDevice
 from homeassistant.config_entries import ConfigFlow, FlowResult
 from homeassistant.exceptions import HomeAssistantError
-from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig
+from homeassistant.helpers.selector import (
+    SelectSelector,
+    SelectSelectorConfig,
+    SelectSelectorMode,
+)
 
 from .const import (
     CONF_ADDRESS,
@@ -92,6 +96,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
                                 blind_type.value for blind_type in MotionBlindType
                             ],
                             translation_key=CONF_BLIND_TYPE,
+                            mode=SelectSelectorMode.DROPDOWN,
                         )
                     )
                 }

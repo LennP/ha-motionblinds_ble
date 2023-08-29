@@ -43,7 +43,7 @@ SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
 SETTING_MAX_MOTOR_FEEDBACK_TIME = 2  # Seconds
 
 
-class MotionBlindType(StrEnum):
+class MotionBlindEntityType(StrEnum):
     POSITION = "position"
     TILT = "tilt"
     POSITION_TILT = "position_tilt"
@@ -61,3 +61,14 @@ class MotionCalibrationType(StrEnum):
     CALIBRATED = "calibrated"
     UNCALIBRATED = "uncalibrated"
     CALIBRATING = "calibrating"
+
+
+class MotionBlindType(StrEnum):
+    ROLLER = "roller"
+    HONEYCOMB = "honeycomb"
+    ROMAN = "roman"
+    VENETIAN = "venetian"
+    VENETIAN_TILT_ONLY = "venetian_tilt_only"
+    DOUBLE_ROLLER = "double_roller"
+    CURTAIN = "curtain"
+    VERTICAL = "vertical"

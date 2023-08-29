@@ -36,6 +36,7 @@ from .const import (
     DOMAIN,
     MANUFACTURER,
     SETTING_DOUBLE_CLICK_TIME,
+    MotionBlindEntityType,
     MotionBlindType,
     MotionCalibrationType,
     MotionRunningType,
@@ -54,16 +55,34 @@ _LOGGER = logging.getLogger(__name__)
 class MotionCoverEntityDescription(CoverEntityDescription):
     key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
     translation_key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
-    device_class: CoverDeviceClass = field(default=CoverDeviceClass.BLIND, init=True)
+    device_class: CoverDeviceClass = field(default=CoverDeviceClass.SHADE, init=True)
 
 
-COVER_TYPES: dict[MotionBlindType, MotionCoverEntityDescription] = {
-    MotionBlindType.POSITION: MotionCoverEntityDescription(),
-    MotionBlindType.POSITION_CURTAIN: MotionCoverEntityDescription(
+BLIND_TO_ENTITY_TYPE: dict[str, MotionBlindEntityType] = {
+    MotionBlindType.ROLLER.value: MotionBlindEntityType.POSITION,
+    MotionBlindType.HONEYCOMB.value: MotionBlindEntityType.POSITION,
+    MotionBlindType.ROMAN.value: MotionBlindEntityType.POSITION,
+    MotionBlindType.VENETIAN.value: MotionBlindEntityType.POSITION_TILT,
+    MotionBlindType.VENETIAN_TILT_ONLY.value: MotionBlindEntityType.TILT,
+    MotionBlindType.DOUBLE_ROLLER.value: MotionBlindEntityType.POSITION_TILT,
+    MotionBlindType.CURTAIN.value: MotionBlindEntityType.POSITION_CURTAIN,
+    MotionBlindType.VERTICAL.value: MotionBlindEntityType.POSITION_TILT,
+}
+
+COVER_TYPES: dict[str, MotionCoverEntityDescription] = {
+    MotionBlindType.ROLLER.value: MotionCoverEntityDescription(),
+    MotionBlindType.HONEYCOMB.value: MotionCoverEntityDescription(),
+    MotionBlindType.ROMAN.value: MotionCoverEntityDescription(),
+    MotionBlindType.VENETIAN.value: MotionCoverEntityDescription(
+        device_class=CoverDeviceClass.BLIND
+    ),
+    MotionBlindType.VENETIAN_TILT_ONLY.value: MotionCoverEntityDescription(
+        device_class=CoverDeviceClass.SHUTTER
+    ),
+    MotionBlindType.DOUBLE_ROLLER.value: MotionCoverEntityDescription(),
+    MotionBlindType.CURTAIN.value: MotionCoverEntityDescription(
         device_class=CoverDeviceClass.CURTAIN
     ),
-    MotionBlindType.TILT: MotionCoverEntityDescription(),
-    MotionBlindType.POSITION_TILT: MotionCoverEntityDescription(),
 }
 
 
@@ -74,11 +93,12 @@ async def async_setup_entry(
     _LOGGER.info("Setting up cover with data %s", entry.data)
 
     blind = None
-    if entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION:
+    blind_entity_type = BLIND_TO_ENTITY_TYPE[entry.data[CONF_BLIND_TYPE]]
+    if blind_entity_type == MotionBlindEntityType.POSITION:
         blind = PositionBlind(entry)
-    elif entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION_CURTAIN:
+    elif blind_entity_type == MotionBlindEntityType.POSITION_CURTAIN:
         blind = PositionCurtainBlind(entry)
-    elif entry.data[CONF_BLIND_TYPE] == MotionBlindType.TILT:
+    elif blind_entity_type == MotionBlindEntityType.TILT:
         blind = TiltBlind(entry)
     else:
         blind = PositionTiltBlind(entry)
@@ -106,7 +126,7 @@ class GenericBlind(CoverEntity):
         """Initialize the blind."""
         super().__init__()
         self.entity_description = COVER_TYPES[
-            MotionBlindType(entry.data[CONF_BLIND_TYPE])
+            entry.data[CONF_BLIND_TYPE]
         ]
         self.config_entry: ConfigEntry = entry
         self.device_address: str = entry.data[CONF_ADDRESS]

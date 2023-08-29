@@ -17,7 +17,7 @@ from .const import (
     DOMAIN,
     ICON_SPEED,
     SETTING_MAX_MOTOR_FEEDBACK_TIME,
-    MotionBlindType,
+    MotionBlindEntityType,
 )
 from .cover import GenericBlind
 from .motionblinds_ble.const import MotionSpeedLevel
@@ -50,7 +50,10 @@ async def async_setup_entry(
     _LOGGER.info("Setting up SpeedSelect")
     blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
-    if blind.config_entry.data[CONF_BLIND_TYPE] != MotionBlindType.POSITION_CURTAIN:
+    if (
+        blind.config_entry.data[CONF_BLIND_TYPE]
+        != MotionBlindEntityType.POSITION_CURTAIN
+    ):
         async_add_entities([SpeedSelect(blind)])
 
 
