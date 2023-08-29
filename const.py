@@ -30,7 +30,6 @@ ICON_CONNECT = "mdi:bluetooth"
 ICON_DISCONNECT = "mdi:bluetooth-off"
 ICON_FAVORITE = "mdi:star"
 ICON_CONNECTION_TYPE = "mdi:bluetooth-connect"
-ICON_CURTAIN = "mdi:curtains"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
 
@@ -40,6 +39,7 @@ SERVICE_FAVORITE = "favorite"
 SERVICE_STATUS = "status"
 
 SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
+SETTING_MAX_MOTOR_FEEDBACK_TIME = 2  # Seconds
 
 
 class MotionBlindType(StrEnum):

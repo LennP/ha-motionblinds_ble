@@ -2,16 +2,15 @@
 import logging
 from asyncio import CancelledError, Task, TimerHandle, create_task, get_event_loop
 from collections.abc import Callable, Coroutine
+from dataclasses import dataclass
 from datetime import datetime
-from time import time_ns, time
+from time import time, time_ns
 
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
-from bleak.exc import BleakError
 from bleak.backends.device import BLEDevice
-from bleak_retry_connector import establish_connection, BleakOutOfConnectionSlotsError
-
-from dataclasses import dataclass
+from bleak.exc import BleakError
+from bleak_retry_connector import BleakOutOfConnectionSlotsError, establish_connection
 
 from .const import (
     SETTING_DISCONNECT_TIME,
@@ -214,7 +213,6 @@ class MotionDevice:
         if self._current_bleak_client is not None:
             _LOGGER.info("Disconnecting %s", self._device_address)
             await self._current_bleak_client.disconnect()
-            self.set_connection(MotionConnectionType.DISCONNECTED)
             self._current_bleak_client = None
 
     async def _connect_if_not_connecting(self) -> bool:
@@ -250,8 +248,6 @@ class MotionDevice:
         is_last_caller = (
             self._last_connection_caller_time == this_connection_caller_time
         )
-        if is_last_caller:
-            self.refresh_disconnect_timer()
         return is_last_caller  # Return whether or not this function was the last caller
 
     async def _connect(self) -> bool:
@@ -286,6 +282,7 @@ class MotionDevice:
         await self.status_query()
 
         bleak_client.set_disconnected_callback(self._disconnect_callback)
+        self.refresh_disconnect_timer()
 
         return True
 
