@@ -212,6 +212,7 @@ class MotionDevice:
             self._connection_task = None
         if self._current_bleak_client is not None:
             _LOGGER.info("Disconnecting %s", self._device_address)
+            self._cancel_disconnect_timer()
             await self._current_bleak_client.disconnect()
             self._current_bleak_client = None
 
