@@ -10,6 +10,7 @@ ATTR_BATTERY = "battery"
 ATTR_CONNECT = "connect"
 ATTR_DISCONNECT = "disconnect"
 ATTR_FAVORITE = "favorite"
+ATTR_SIGNAL_STRENGTH = "signal_strength"
 
 CONF_LOCAL_NAME = "local_name"
 CONF_ADDRESS = "address"

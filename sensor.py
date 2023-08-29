@@ -7,26 +7,27 @@ from homeassistant.components.sensor import (
     SensorEntity,
     SensorEntityDescription,
     SensorStateClass,
-    ENTITY_ID_FORMAT,
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.components.bluetooth import async_ble_device_from_address
+from homeassistant.components.bluetooth.wrappers import BLEDevice
 
 from .const import (
-    DOMAIN,
     ATTR_BATTERY,
-    ATTR_CONNECTION_TYPE,
     ATTR_CALIBRATION,
-    ICON_CONNECTION_TYPE,
-    ICON_CALIBRATION,
-    MotionCalibrationType,
-    MotionBlindType,
+    ATTR_CONNECTION_TYPE,
+    ATTR_SIGNAL_STRENGTH,
     CONF_BLIND_TYPE,
+    DOMAIN,
+    ICON_CALIBRATION,
+    ICON_CONNECTION_TYPE,
+    MotionBlindType,
+    MotionCalibrationType,
 )
-from .cover import GenericBlind
-
+from .cover import GenericBlind, PositionCurtainBlind
 from .motionblinds_ble.const import MotionConnectionType
 
 _LOGGER = logging.getLogger(__name__)
@@ -60,6 +61,15 @@ SENSOR_TYPES: dict[str, SensorEntityDescription] = {
         entity_category=EntityCategory.DIAGNOSTIC,
         has_entity_name=True,
     ),
+    ATTR_SIGNAL_STRENGTH: SensorEntityDescription(
+        key=ATTR_SIGNAL_STRENGTH,
+        translation_key=ATTR_SIGNAL_STRENGTH,
+        # icon=ICON_SIGNAL_STRENGTH,
+        device_class=SensorDeviceClass.SIGNAL_STRENGTH,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement="dBm",
+        has_entity_name=True,
+    ),
 }
 
 
@@ -67,13 +77,17 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up battery sensors based on a config entry."""
-    _LOGGER.info("Setting up BatterySensor")
+    _LOGGER.info("Setting up sensors")
     blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
-    async_add_entities([BatterySensor(blind), ConnectionSensor(blind)])
+    entities: list[SensorEntity] = [
+        BatterySensor(blind),
+        ConnectionSensor(blind),
+        SignalStrengthSensor(blind),
+    ]
     if blind.config_entry.data[CONF_BLIND_TYPE] == MotionBlindType.POSITION_CURTAIN:
-        _LOGGER.info("Setting up CalibrationSensor")
-        async_add_entities([CalibrationSensor(blind)])
+        entities.append(CalibrationSensor(blind))
+    async_add_entities(entities)
 
 
 class BatterySensor(SensorEntity):
@@ -129,7 +143,7 @@ class ConnectionSensor(SensorEntity):
 class CalibrationSensor(SensorEntity):
     """Representation of a calibration sensor."""
 
-    def __init__(self, blind: GenericBlind) -> None:
+    def __init__(self, blind: PositionCurtainBlind) -> None:
         """Initialize the calibration sensor."""
         self.entity_description = SENSOR_TYPES[ATTR_CALIBRATION]
         self._blind = blind
@@ -146,4 +160,30 @@ class CalibrationSensor(SensorEntity):
     def async_update_calibrated(self, calibration_type: MotionCalibrationType) -> None:
         """Update the calibration sensor value."""
         self._attr_native_value = calibration_type
+        self.async_write_ha_state()
+
+
+class SignalStrengthSensor(SensorEntity):
+    """Representation of a signal strength sensor."""
+
+    def __init__(self, blind: GenericBlind) -> None:
+        """Initialize the calibration sensor."""
+        self.entity_description = SENSOR_TYPES[ATTR_SIGNAL_STRENGTH]
+        self._blind = blind
+        self._attr_unique_id = f"{blind.unique_id}_{ATTR_SIGNAL_STRENGTH}"
+        self._attr_device_info = blind.device_info
+        self._attr_native_value = None
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added."""
+        self._blind.async_register_signal_strength_callback(
+            self.async_update_signal_strength
+        )
+        self.async_update_signal_strength(self._blind.device_rssi)
+        return await super().async_added_to_hass()
+
+    @callback
+    def async_update_signal_strength(self, signal_strength: int) -> None:
+        """Update the calibration sensor value."""
+        self._attr_native_value = signal_strength
         self.async_write_ha_state()

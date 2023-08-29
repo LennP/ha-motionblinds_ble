@@ -132,6 +132,9 @@
                     "uncalibrated": "No",
                     "calibrating": "Calibrating..."
                 }
+            },
+            "signal_strength": {
+                "name": "Signal strength"
             }
         }
     }

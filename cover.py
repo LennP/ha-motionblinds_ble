@@ -89,8 +89,9 @@ async def async_setup_entry(
 class GenericBlind(CoverEntity):
     """Representation of a blind."""
 
+    device_address: str = None
+    device_rssi: int = None
     _device: MotionDevice = None
-    _device_address: str = None
     _attr_connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
 
     _last_stop_click_time: int = None
@@ -99,6 +100,7 @@ class GenericBlind(CoverEntity):
     _battery_callback: Callable[[int], None] = None
     _speed_callback: Callable[[MotionSpeedLevel], None] = None
     _connection_callback: Callable[[MotionConnectionType], None] = None
+    _signal_strength_callback: Callable[[int], None] = None
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the blind."""
@@ -107,7 +109,7 @@ class GenericBlind(CoverEntity):
             MotionBlindType(entry.data[CONF_BLIND_TYPE])
         ]
         self.config_entry: ConfigEntry = entry
-        self._device_address: str = entry.data[CONF_ADDRESS]
+        self.device_address: str = entry.data[CONF_ADDRESS]
         self._attr_name: str = f"MotionBlind {entry.data[CONF_MAC_CODE]}"
         self._attr_unique_id: str = entry.data[CONF_ADDRESS]
         self._attr_device_info: DeviceInfo = DeviceInfo(
@@ -119,12 +121,12 @@ class GenericBlind(CoverEntity):
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
-        ble_device = async_ble_device_from_address(self.hass, self._device_address)
-        self._device = MotionDevice(self._device_address, ble_device)
+        ble_device = async_ble_device_from_address(self.hass, self.device_address)
+        self._device = MotionDevice(self.device_address, ble_device)
         async_register_callback(
             self.hass,
             self.async_update_ble_device,
-            BluetoothCallbackMatcher(address=self._device_address),
+            BluetoothCallbackMatcher(address=self.device_address),
             BluetoothScanningMode.ACTIVE,
         )
         # Pass functions used to schedule tasks
@@ -132,7 +134,7 @@ class GenericBlind(CoverEntity):
             partial(
                 self.config_entry.async_create_task,
                 hass=self.hass,
-                name=self._device_address,
+                name=self.device_address,
             )
         )
         self._device.set_ha_call_later(partial(async_call_later, hass=self.hass))
@@ -179,13 +181,13 @@ class GenericBlind(CoverEntity):
             < SETTING_DOUBLE_CLICK_TIME
         ):
             # Favorite
-            _LOGGER.info("Favorite %s", self._device_address)
+            _LOGGER.info("Favorite %s", self.device_address)
             if await self._device.favorite():
                 self.async_refresh_disconnect_timer()
             self._last_stop_click_time = None
         else:
             # Stop
-            _LOGGER.info("Stop %s", self._device_address)
+            _LOGGER.info("Stop %s", self.device_address)
             if await self._device.stop():
                 self.async_refresh_disconnect_timer()
             self._last_stop_click_time = current_stop_click_time
@@ -193,13 +195,13 @@ class GenericBlind(CoverEntity):
     async def async_favorite(self, **kwargs: any) -> None:
         """Move the blind to the favorite position."""
         self.async_update_running(MotionRunningType.UNKNOWN)
-        _LOGGER.info("Favorite %s", self._device_address)
+        _LOGGER.info("Favorite %s", self.device_address)
         if await self._device.favorite():
             self.async_refresh_disconnect_timer()
 
     async def async_speed(self, speed_level: MotionSpeedLevel, **kwargs: any) -> None:
         """Change the speed level of the device."""
-        _LOGGER.info("Speed %s", self._device_address)
+        _LOGGER.info("Speed %s", self.device_address)
         if await self._device.speed(speed_level):
             self.async_refresh_disconnect_timer()
 
@@ -294,6 +296,9 @@ class GenericBlind(CoverEntity):
     ) -> None:
         _LOGGER.warning(f"New BLE device for {service_info.address}!")
         self._device.set_ble_device(service_info.device)
+        self.device_rssi = service_info.advertisement.rssi
+        if callable(self._signal_strength_callback):
+            self._signal_strength_callback(self.device_rssi)
 
     def async_register_battery_callback(
         self, _battery_callback: Callable[[int], None]
@@ -312,6 +317,12 @@ class GenericBlind(CoverEntity):
     ) -> None:
         """Register the callback used to update the connection."""
         self._connection_callback = _connection_callback
+
+    def async_register_signal_strength_callback(
+        self, _signal_strength_callback: Callable[[int], None]
+    ) -> None:
+        """Register the callback used to update the signal strength."""
+        self._signal_strength_callback = _signal_strength_callback
 
     @property
     def extra_state_attributes(self) -> Mapping[str, str]:
@@ -336,7 +347,7 @@ class PositionBlind(GenericBlind):
 
     async def async_open_cover(self, **kwargs: any) -> None:
         """Open the blind."""
-        _LOGGER.info("Open %s", self._device_address)
+        _LOGGER.info("Open %s", self.device_address)
         self.async_update_running(MotionRunningType.OPENING)
         if await self._device.open():
             self.async_refresh_disconnect_timer()
@@ -346,7 +357,7 @@ class PositionBlind(GenericBlind):
 
     async def async_close_cover(self, **kwargs: any) -> None:
         """Close the blind."""
-        _LOGGER.info("Close %s", self._device_address)
+        _LOGGER.info("Close %s", self.device_address)
         self.async_update_running(MotionRunningType.CLOSING)
         if await self._device.close():
             self.async_refresh_disconnect_timer()
@@ -358,7 +369,7 @@ class PositionBlind(GenericBlind):
         """Move the blind to a specific position."""
         new_position = 100 - kwargs.get(ATTR_POSITION)
 
-        _LOGGER.info("Set position to %s %s", str(new_position), self._device_address)
+        _LOGGER.info("Set position to %s %s", str(new_position), self.device_address)
         self.async_update_running(
             MotionRunningType.STILL
             if self._attr_current_cover_position is None
@@ -391,7 +402,7 @@ class TiltBlind(GenericBlind):
 
     async def async_open_cover_tilt(self, **kwargs: any) -> None:
         """Tilt the blind open."""
-        _LOGGER.info("Open tilt %s", self._device_address)
+        _LOGGER.info("Open tilt %s", self.device_address)
         self.async_update_running(MotionRunningType.OPENING)
         if await self._device.open_tilt():
             self.async_refresh_disconnect_timer()
@@ -401,7 +412,7 @@ class TiltBlind(GenericBlind):
 
     async def async_close_cover_tilt(self, **kwargs: any) -> None:
         """Tilt the blind closed."""
-        _LOGGER.info("Close tilt %s", self._device_address)
+        _LOGGER.info("Close tilt %s", self.device_address)
         self.async_update_running(MotionRunningType.CLOSING)
         if await self._device.close_tilt():
             self.async_refresh_disconnect_timer()
@@ -418,7 +429,7 @@ class TiltBlind(GenericBlind):
         new_tilt_position = 100 - kwargs.get(ATTR_TILT_POSITION)
 
         _LOGGER.info(
-            "Set tilt position to %s %s", str(new_tilt_position), self._device_address
+            "Set tilt position to %s %s", str(new_tilt_position), self.device_address
         )
         self.async_update_running(
             MotionRunningType.STILL

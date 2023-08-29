@@ -124,7 +124,6 @@ class MotionDevice:
         async def _disconnect_later(t: datetime = None):
             _LOGGER.info(f"Disconnecting after {timeout}s")
             await self.disconnect()
-            self.set_connection(MotionConnectionType.DISCONNECTED)
 
         self._disconnect_time = new_disconnect_time
         if self._ha_call_later:
@@ -193,6 +192,7 @@ class MotionDevice:
         """Callback called by Bleak when a client disconnects."""
         _LOGGER.info("Device %s disconnected!", self._device_address)
         self.set_connection(MotionConnectionType.DISCONNECTED)
+        self._current_bleak_client = None
 
     async def connect(self) -> bool:
         """Connect to the device if not connected, return whether or not the motor is ready for a command."""
@@ -215,6 +215,7 @@ class MotionDevice:
             self._cancel_disconnect_timer()
             await self._current_bleak_client.disconnect()
             self._current_bleak_client = None
+        self.set_connection(MotionConnectionType.DISCONNECTED)
 
     async def _connect_if_not_connecting(self) -> bool:
         """Connect if no connection is currently attempted, return True if the motor is ready for a command and only to the last caller."""
