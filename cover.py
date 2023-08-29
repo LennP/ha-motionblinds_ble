@@ -184,7 +184,7 @@ class GenericBlind(CoverEntity):
             self.async_refresh_disconnect_timer()
 
     def async_update_running(self, running_type: MotionRunningType) -> None:
-        """Callback used to update whether the blind is running (opening/closing) or not."""
+        """Used to update whether the blind is running (opening/closing) or not."""
         self._attr_is_opening = (
             False
             if running_type == MotionRunningType.STILL
@@ -442,15 +442,20 @@ class PositionCurtainBlind(PositionBlind):
     _calibration_callback: Callable[[MotionCalibrationType], None] = None
 
     def async_update_running(self, running_type: MotionRunningType) -> None:
-        if running_type is not MotionRunningType.STILL:
-            # Motor will calibrate if not calibrated and moved to some position
+        if (
+            self._calibration_type is MotionCalibrationType.UNCALIBRATED
+            and running_type is not MotionRunningType.STILL
+        ):
+            # Curtain motor will calibrate if not calibrated and moved to some position
             _LOGGER.info("Starting calibration")
             self._calibration_type = MotionCalibrationType.CALIBRATING
             self._calibration_callback(MotionCalibrationType.CALIBRATING)
             self.async_refresh_disconnect_timer(SETTING_CALIBRATION_DISCONNECT_TIME)
         super().async_update_running(running_type)
 
+    @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
+        """Update the calibration status of the motor."""
         _LOGGER.info("Calibrated: %s", end_position_info.UP)
         new_calibration_type = (
             MotionCalibrationType.CALIBRATED
@@ -458,10 +463,10 @@ class PositionCurtainBlind(PositionBlind):
             else MotionCalibrationType.UNCALIBRATED
         )
         if (
-            self._calibration_type is MotionCalibrationType.UNCALIBRATED
-            and new_calibration_type is MotionCalibrationType.CALIBRATED
+            self._calibration_type is MotionCalibrationType.CALIBRATING
+            and new_calibration_type is not MotionCalibrationType.CALIBRATING
         ):
-            # Refresh disconnect timer to default value
+            # Refresh disconnect timer to default value if finished calibrating
             self.async_refresh_disconnect_timer(force=True)
         self._calibration_callback(new_calibration_type)
         self._calibration_type = new_calibration_type
