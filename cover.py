@@ -6,28 +6,46 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import partial
 
-from homeassistant.components.bluetooth import (BluetoothCallbackMatcher,
-                                                BluetoothChange,
-                                                BluetoothScanningMode,
-                                                BluetoothServiceInfoBleak,
-                                                async_ble_device_from_address,
-                                                async_register_callback)
-from homeassistant.components.cover import (ATTR_POSITION, ATTR_TILT_POSITION,
-                                            CoverDeviceClass, CoverEntity,
-                                            CoverEntityDescription,
-                                            CoverEntityFeature)
+from homeassistant.components.bluetooth import (
+    BluetoothCallbackMatcher,
+    BluetoothChange,
+    BluetoothScanningMode,
+    BluetoothServiceInfoBleak,
+    async_ble_device_from_address,
+    async_register_callback,
+)
+from homeassistant.components.cover import (
+    ATTR_POSITION,
+    ATTR_TILT_POSITION,
+    CoverDeviceClass,
+    CoverEntity,
+    CoverEntityDescription,
+    CoverEntityFeature,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
-from .const import (ATTR_CONNECTION_TYPE, CONF_ADDRESS, CONF_BLIND_TYPE,
-                    CONF_MAC_CODE, DOMAIN, MANUFACTURER,
-                    SETTING_DOUBLE_CLICK_TIME, MotionBlindEntityType,
-                    MotionBlindType, MotionCalibrationType, MotionRunningType)
-from .motionblinds_ble.const import (SETTING_CALIBRATION_DISCONNECT_TIME,
-                                     MotionConnectionType, MotionSpeedLevel)
+from .const import (
+    ATTR_CONNECTION_TYPE,
+    CONF_ADDRESS,
+    CONF_BLIND_TYPE,
+    CONF_MAC_CODE,
+    DOMAIN,
+    MANUFACTURER,
+    SETTING_DOUBLE_CLICK_TIME,
+    MotionBlindEntityType,
+    MotionBlindType,
+    MotionCalibrationType,
+    MotionRunningType,
+)
+from .motionblinds_ble.const import (
+    SETTING_CALIBRATION_DISCONNECT_TIME,
+    MotionConnectionType,
+    MotionSpeedLevel,
+)
 from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -98,6 +116,7 @@ class GenericBlind(CoverEntity):
     device_rssi: int = None
     _device: MotionDevice = None
     _attr_connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
+    _running_type: MotionRunningType = None
 
     _last_stop_click_time: int = None
     _allow_position_feedback: bool = False
@@ -210,6 +229,7 @@ class GenericBlind(CoverEntity):
 
     def async_update_running(self, running_type: MotionRunningType) -> None:
         """Used to update whether the blind is running (opening/closing) or not."""
+        self._running_type = running_type
         self._attr_is_opening = (
             False
             if running_type == MotionRunningType.STILL
@@ -498,18 +518,24 @@ class PositionCurtainBlind(PositionBlind):
         """Update the calibration status of the motor."""
         _LOGGER.info("Calibrated: %s", end_position_info.UP)
         new_calibration_type = (
-            MotionCalibrationType.CALIBRATED
+            MotionCalibrationType.CALIBRATED  # Calibrated if end positions are set
             if end_position_info.UP
-            else MotionCalibrationType.UNCALIBRATED
+            else MotionCalibrationType.UNCALIBRATED  # Uncalibrated if no end positions, and motor is not running
+            if self._running_type is not None
+            and self._running_type is not MotionRunningType.STILL
+            else MotionCalibrationType.CALIBRATING
         )
+        _LOGGER.warning(new_calibration_type)
+
         if (
             self._calibration_type is MotionCalibrationType.CALIBRATING
             and new_calibration_type is not MotionCalibrationType.CALIBRATING
         ):
             # Refresh disconnect timer to default value if finished calibrating
             self.async_refresh_disconnect_timer(force=True)
-        self._calibration_callback(new_calibration_type)
         self._calibration_type = new_calibration_type
+        if callable(self._calibration_callback):
+            self._calibration_callback(new_calibration_type)
 
     def async_register_calibration_callback(
         self, _calibration_callback: Callable[[MotionCalibrationType], None]
