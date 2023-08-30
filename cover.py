@@ -6,46 +6,28 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import partial
 
-from homeassistant.components.bluetooth import (
-    BluetoothCallbackMatcher,
-    BluetoothChange,
-    BluetoothScanningMode,
-    BluetoothServiceInfoBleak,
-    async_ble_device_from_address,
-    async_register_callback,
-)
-from homeassistant.components.cover import (
-    ATTR_POSITION,
-    ATTR_TILT_POSITION,
-    CoverDeviceClass,
-    CoverEntity,
-    CoverEntityDescription,
-    CoverEntityFeature,
-)
+from homeassistant.components.bluetooth import (BluetoothCallbackMatcher,
+                                                BluetoothChange,
+                                                BluetoothScanningMode,
+                                                BluetoothServiceInfoBleak,
+                                                async_ble_device_from_address,
+                                                async_register_callback)
+from homeassistant.components.cover import (ATTR_POSITION, ATTR_TILT_POSITION,
+                                            CoverDeviceClass, CoverEntity,
+                                            CoverEntityDescription,
+                                            CoverEntityFeature)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
-from .const import (
-    ATTR_CONNECTION_TYPE,
-    CONF_ADDRESS,
-    CONF_BLIND_TYPE,
-    CONF_MAC_CODE,
-    DOMAIN,
-    MANUFACTURER,
-    SETTING_DOUBLE_CLICK_TIME,
-    MotionBlindEntityType,
-    MotionBlindType,
-    MotionCalibrationType,
-    MotionRunningType,
-)
-from .motionblinds_ble.const import (
-    SETTING_CALIBRATION_DISCONNECT_TIME,
-    MotionConnectionType,
-    MotionSpeedLevel,
-)
+from .const import (ATTR_CONNECTION_TYPE, CONF_ADDRESS, CONF_BLIND_TYPE,
+                    CONF_MAC_CODE, DOMAIN, MANUFACTURER,
+                    SETTING_DOUBLE_CLICK_TIME, MotionBlindEntityType,
+                    MotionBlindType, MotionCalibrationType, MotionRunningType)
+from .motionblinds_ble.const import (SETTING_CALIBRATION_DISCONNECT_TIME,
+                                     MotionConnectionType, MotionSpeedLevel)
 from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -77,10 +59,13 @@ COVER_TYPES: dict[str, MotionCoverEntityDescription] = {
         device_class=CoverDeviceClass.BLIND
     ),
     MotionBlindType.VENETIAN_TILT_ONLY.value: MotionCoverEntityDescription(
-        device_class=CoverDeviceClass.SHUTTER
+        device_class=CoverDeviceClass.BLIND
     ),
     MotionBlindType.DOUBLE_ROLLER.value: MotionCoverEntityDescription(),
     MotionBlindType.CURTAIN.value: MotionCoverEntityDescription(
+        device_class=CoverDeviceClass.CURTAIN
+    ),
+    MotionBlindType.VERTICAL.value: MotionCoverEntityDescription(
         device_class=CoverDeviceClass.CURTAIN
     ),
 }
@@ -125,9 +110,7 @@ class GenericBlind(CoverEntity):
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the blind."""
         super().__init__()
-        self.entity_description = COVER_TYPES[
-            entry.data[CONF_BLIND_TYPE]
-        ]
+        self.entity_description = COVER_TYPES[entry.data[CONF_BLIND_TYPE]]
         self.config_entry: ConfigEntry = entry
         self.device_address: str = entry.data[CONF_ADDRESS]
         self._attr_name: str = f"MotionBlind {entry.data[CONF_MAC_CODE]}"
@@ -492,6 +475,11 @@ class PositionCurtainBlind(PositionBlind):
     _calibration_type: MotionCalibrationType = None
     _calibration_callback: Callable[[MotionCalibrationType], None] = None
 
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added."""
+        _LOGGER.info("PositionCurtainBlind has been added!")
+        await super().async_added_to_hass()
+
     def async_update_running(self, running_type: MotionRunningType) -> None:
         if (
             self._calibration_type is MotionCalibrationType.UNCALIBRATED
@@ -500,7 +488,8 @@ class PositionCurtainBlind(PositionBlind):
             # Curtain motor will calibrate if not calibrated and moved to some position
             _LOGGER.info("Starting calibration")
             self._calibration_type = MotionCalibrationType.CALIBRATING
-            self._calibration_callback(MotionCalibrationType.CALIBRATING)
+            if callable(self._calibration_callback):
+                self._calibration_callback(MotionCalibrationType.CALIBRATING)
             self.async_refresh_disconnect_timer(SETTING_CALIBRATION_DISCONNECT_TIME)
         super().async_update_running(running_type)
 

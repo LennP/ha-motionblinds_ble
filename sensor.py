@@ -23,7 +23,7 @@ from .const import (
     DOMAIN,
     ICON_CALIBRATION,
     ICON_CONNECTION_TYPE,
-    MotionBlindEntityType,
+    MotionBlindType,
     MotionCalibrationType,
 )
 from .cover import GenericBlind, PositionCurtainBlind
@@ -63,7 +63,6 @@ SENSOR_TYPES: dict[str, SensorEntityDescription] = {
     ATTR_SIGNAL_STRENGTH: SensorEntityDescription(
         key=ATTR_SIGNAL_STRENGTH,
         translation_key=ATTR_SIGNAL_STRENGTH,
-        # icon=ICON_SIGNAL_STRENGTH,
         device_class=SensorDeviceClass.SIGNAL_STRENGTH,
         entity_category=EntityCategory.DIAGNOSTIC,
         native_unit_of_measurement="dBm",
@@ -84,10 +83,7 @@ async def async_setup_entry(
         ConnectionSensor(blind),
         SignalStrengthSensor(blind),
     ]
-    if (
-        blind.config_entry.data[CONF_BLIND_TYPE]
-        == MotionBlindEntityType.POSITION_CURTAIN
-    ):
+    if blind.config_entry.data[CONF_BLIND_TYPE] == MotionBlindType.CURTAIN:
         entities.append(CalibrationSensor(blind))
     async_add_entities(entities)
 

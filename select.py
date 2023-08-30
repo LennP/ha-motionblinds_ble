@@ -4,21 +4,16 @@ import logging
 from collections.abc import Callable
 from datetime import datetime
 
-from homeassistant.components.select import SelectEntity, SelectEntityDescription
+from homeassistant.components.select import (SelectEntity,
+                                             SelectEntityDescription)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
-from .const import (
-    ATTR_SPEED,
-    CONF_BLIND_TYPE,
-    DOMAIN,
-    ICON_SPEED,
-    SETTING_MAX_MOTOR_FEEDBACK_TIME,
-    MotionBlindEntityType,
-)
+from .const import (ATTR_SPEED, CONF_BLIND_TYPE, DOMAIN, ICON_SPEED,
+                    SETTING_MAX_MOTOR_FEEDBACK_TIME, MotionBlindType)
 from .cover import GenericBlind
 from .motionblinds_ble.const import MotionSpeedLevel
 
@@ -50,10 +45,7 @@ async def async_setup_entry(
     _LOGGER.info("Setting up SpeedSelect")
     blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
-    if (
-        blind.config_entry.data[CONF_BLIND_TYPE]
-        != MotionBlindEntityType.POSITION_CURTAIN
-    ):
+    if blind.config_entry.data[CONF_BLIND_TYPE] != MotionBlindType.CURTAIN:
         async_add_entities([SpeedSelect(blind)])
 
 
