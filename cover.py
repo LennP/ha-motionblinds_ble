@@ -2,11 +2,10 @@
 
 import logging
 import time
+from asyncio import Event
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import partial
-
-from asyncio import Event
 
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
@@ -36,6 +35,8 @@ from .const import (
     CONF_BLIND_TYPE,
     CONF_MAC_CODE,
     DOMAIN,
+    ENTITY_NAME,
+    EXCEPTION_NOT_CALIBRATED,
     MANUFACTURER,
     SETTING_DOUBLE_CLICK_TIME,
     MotionBlindType,
@@ -131,7 +132,7 @@ class GenericBlind(CoverEntity):
         self.entity_description = COVER_TYPES[entry.data[CONF_BLIND_TYPE]]
         self.config_entry: ConfigEntry = entry
         self.device_address: str = entry.data[CONF_ADDRESS]
-        self._attr_name: str = f"MotionBlind {entry.data[CONF_MAC_CODE]}"
+        self._attr_name: str = ENTITY_NAME.format(mac_code=entry.data[CONF_MAC_CODE])
         self._attr_unique_id: str = entry.data[CONF_ADDRESS]
         self._attr_device_info: DeviceInfo = DeviceInfo(
             identifiers={(DOMAIN, entry.data[CONF_MAC_CODE])},
@@ -173,7 +174,7 @@ class GenericBlind(CoverEntity):
         """Refresh the time before the blind is disconnected."""
         self._device.refresh_disconnect_timer(timeout, force)
 
-    async def async_connect(self) -> bool:
+    async def async_connect(self, notification_delay: bool = False) -> bool:
         """Connect to the blind."""
         connected = False
         if self._device:
@@ -583,14 +584,19 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
         # If motor is not calibrated, raise an exception
         if self._calibration_type is not MotionCalibrationType.CALIBRATED:
             raise NotCalibratedException(
-                f"{self._attr_name} needs to be calibrated using the MotionBlinds BLE app before usage."
+                EXCEPTION_NOT_CALIBRATED.format(device_name=self._attr_name)
             )
         return True
 
     @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
+        """Update the calibration status of the motor."""
         super().async_update_calibration(end_position_info)
         self._calibration_event.set()
+
+    async def async_connect(self) -> bool:
+        """Connect to the blind, add a delay before sending the status query."""
+        await super().async_connect(notification_delay=True)
 
 
 class NotCalibratedException(Exception):

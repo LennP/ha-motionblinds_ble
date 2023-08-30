@@ -19,11 +19,17 @@ CONF_BLIND_TYPE = "blind_type"
 
 DOMAIN = "motionblinds_ble"
 
+ENTITY_NAME = "MotionBlind {mac_code}"
+
 ERROR_ALREADY_CONFIGURED = "already_configured"
 ERROR_COULD_NOT_FIND_MOTOR = "could_not_find_motor"
 ERROR_INVALID_MAC_CODE = "invalid_mac_code"
 ERROR_NO_BLUETOOTH_ADAPTER = "no_bluetooth_adapter"
 ERROR_NO_DEVICES_FOUND = "no_devices_found"
+
+EXCEPTION_NOT_CALIBRATED = (
+    "{device_name} needs to be calibrated using the MotionBlinds BLE app before usage."
+)
 
 ICON_CALIBRATION = "mdi:tune"
 ICON_SPEED = "mdi:run-fast"

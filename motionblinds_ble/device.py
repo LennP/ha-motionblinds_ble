@@ -23,6 +23,7 @@ from .const import (
     SETTING_DISCONNECT_TIME,
     SETTING_MAX_COMMAND_ATTEMPTS,
     SETTING_MAX_CONNECT_ATTEMPTS,
+    SETTING_NOTIFICATION_DELAY,
     MotionCharacteristic,
     MotionCommandType,
     MotionConnectionType,
@@ -204,11 +205,11 @@ class MotionDevice:
         self.set_connection(MotionConnectionType.DISCONNECTED)
         self._current_bleak_client = None
 
-    async def connect(self, command_delay: int = None) -> bool:
+    async def connect(self, notification_delay: bool = False) -> bool:
         """Connect to the device if not connected, return whether or not the motor is ready for a command."""
         if not self.is_connected():
             # Connect if not connected yet and not busy connecting
-            return await self._connect_if_not_connecting(command_delay)
+            return await self._connect_if_not_connecting(notification_delay)
         else:
             self.refresh_disconnect_timer()
         return True
@@ -228,7 +229,9 @@ class MotionDevice:
             self._current_bleak_client = None
         self.set_connection(MotionConnectionType.DISCONNECTED)
 
-    async def _connect_if_not_connecting(self, command_delay: int = None) -> bool:
+    async def _connect_if_not_connecting(
+        self, notification_delay: bool = False
+    ) -> bool:
         """Connect if no connection is currently attempted, return True if the motor is ready for a command and only to the last caller."""
         # Don't try to connect if we are already connecting
         this_connection_caller_time = time_ns()
@@ -238,12 +241,12 @@ class MotionDevice:
             if self._ha_create_task:
                 _LOGGER.warning("HA connecting")
                 self._connection_task = self._ha_create_task(
-                    target=self._connect(command_delay)
+                    target=self._connect(notification_delay)
                 )
             else:
                 _LOGGER.warning("Normal connecting")
                 self._connection_task = get_event_loop().create_task(
-                    self._connect(command_delay)
+                    self._connect(notification_delay)
                 )
         else:
             _LOGGER.info("Already connecting, waiting for connection")
@@ -267,7 +270,7 @@ class MotionDevice:
         )
         return is_last_caller  # Return whether or not this function was the last caller
 
-    async def _connect(self, command_delay: int = None) -> bool:
+    async def _connect(self, notification_delay: bool = False) -> bool:
         """Connect to the device, return whether or not the motor is ready for a command."""
         if self._connection_type is MotionConnectionType.CONNECTING:
             return False
@@ -295,8 +298,8 @@ class MotionDevice:
         # Used to initialize
         await self.set_key()
 
-        if command_delay is not None:
-            await sleep(command_delay)
+        if notification_delay:
+            await sleep(SETTING_NOTIFICATION_DELAY)
         # Set the point (used after calibrating Curtain)
         # await self.point_set_query()
         await self.status_query()
