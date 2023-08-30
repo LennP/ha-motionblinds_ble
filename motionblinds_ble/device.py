@@ -215,6 +215,7 @@ class MotionDevice:
 
     async def disconnect(self) -> None:
         """Called by Home Assistant after X time."""
+        self.set_connection(MotionConnectionType.DISCONNECTING)
         if self._connection_task is not None:
             _LOGGER.info("Cancelling connecting %s", self._device_address)
             self._connection_task.cancel()  # Indicate the connection has failed.

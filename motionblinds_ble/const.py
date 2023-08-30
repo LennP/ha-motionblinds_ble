@@ -42,6 +42,7 @@ class MotionConnectionType(StrEnum):
     CONNECTED = "connected"
     CONNECTING = "connecting"
     DISCONNECTED = "disconnected"
+    DISCONNECTING = "disconnecting"
 
 
 class MotionRunningType(StrEnum):

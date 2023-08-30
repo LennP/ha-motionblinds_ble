@@ -90,7 +90,8 @@
                         "state": {
                             "connected": "Yes",
                             "connecting": "Connecting...",
-                            "disconnected": "No"
+                            "disconnected": "No",
+                            "disconnecting": "Disconnecting..."
                         }
                     }
                 }
@@ -126,7 +127,8 @@
                 "state": {
                     "connected": "Yes",
                     "disconnected": "No",
-                    "connecting": "Connecting..."
+                    "connecting": "Connecting...",
+                    "disconnecting": "Disconnecting..."
                 }
             },
             "calibration": {
