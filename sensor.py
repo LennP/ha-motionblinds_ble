@@ -26,7 +26,7 @@ from .const import (
     MotionBlindType,
     MotionCalibrationType,
 )
-from .cover import GenericBlind, PositionCurtainBlind
+from .cover import GenericBlind, PositionCalibrationBlind
 from .motionblinds_ble.const import MotionConnectionType
 
 _LOGGER = logging.getLogger(__name__)
@@ -83,7 +83,10 @@ async def async_setup_entry(
         ConnectionSensor(blind),
         SignalStrengthSensor(blind),
     ]
-    if blind.config_entry.data[CONF_BLIND_TYPE] == MotionBlindType.CURTAIN:
+    if blind.config_entry.data[CONF_BLIND_TYPE] in [
+        MotionBlindType.CURTAIN.value,
+        MotionBlindType.VERTICAL.value,
+    ]:
         entities.append(CalibrationSensor(blind))
     async_add_entities(entities)
 
@@ -141,7 +144,7 @@ class ConnectionSensor(SensorEntity):
 class CalibrationSensor(SensorEntity):
     """Representation of a calibration sensor."""
 
-    def __init__(self, blind: PositionCurtainBlind) -> None:
+    def __init__(self, blind: PositionCalibrationBlind) -> None:
         """Initialize the calibration sensor."""
         self.entity_description = SENSOR_TYPES[ATTR_CALIBRATION]
         self._blind = blind

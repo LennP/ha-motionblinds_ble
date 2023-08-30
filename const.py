@@ -43,13 +43,6 @@ SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
 SETTING_MAX_MOTOR_FEEDBACK_TIME = 2  # Seconds
 
 
-class MotionBlindEntityType(StrEnum):
-    POSITION = "position"
-    TILT = "tilt"
-    POSITION_TILT = "position_tilt"
-    POSITION_CURTAIN = "position_curtain"
-
-
 class MotionRunningType(StrEnum):
     CLOSING = "closing"
     OPENING = "opening"

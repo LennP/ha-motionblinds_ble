@@ -6,6 +6,8 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import partial
 
+from asyncio import Event
+
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
     BluetoothChange,
@@ -36,7 +38,6 @@ from .const import (
     DOMAIN,
     MANUFACTURER,
     SETTING_DOUBLE_CLICK_TIME,
-    MotionBlindEntityType,
     MotionBlindType,
     MotionCalibrationType,
     MotionRunningType,
@@ -51,23 +52,29 @@ from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 _LOGGER = logging.getLogger(__name__)
 
 
+# Decorator used to perform checks before executing a command
+DECORATOR_FUNCTION = "before_run_command"
+
+
+def run_command(func):
+    async def wrapper(self, *args, **kwargs):
+        # Check if the object has an attribute named DECORATOR_FUNCTION
+        if hasattr(self, DECORATOR_FUNCTION):
+            # Get the attribute and call it
+            before_func = getattr(self, DECORATOR_FUNCTION)
+            if not await before_func(*args, **kwargs):
+                return  # Don't execute function if before_func returns False
+        return await func(self, *args, **kwargs)
+
+    return wrapper
+
+
 @dataclass
 class MotionCoverEntityDescription(CoverEntityDescription):
     key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
     translation_key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
     device_class: CoverDeviceClass = field(default=CoverDeviceClass.SHADE, init=True)
 
-
-BLIND_TO_ENTITY_TYPE: dict[str, MotionBlindEntityType] = {
-    MotionBlindType.ROLLER.value: MotionBlindEntityType.POSITION,
-    MotionBlindType.HONEYCOMB.value: MotionBlindEntityType.POSITION,
-    MotionBlindType.ROMAN.value: MotionBlindEntityType.POSITION,
-    MotionBlindType.VENETIAN.value: MotionBlindEntityType.POSITION_TILT,
-    MotionBlindType.VENETIAN_TILT_ONLY.value: MotionBlindEntityType.TILT,
-    MotionBlindType.DOUBLE_ROLLER.value: MotionBlindEntityType.POSITION_TILT,
-    MotionBlindType.CURTAIN.value: MotionBlindEntityType.POSITION_CURTAIN,
-    MotionBlindType.VERTICAL.value: MotionBlindEntityType.POSITION_TILT,
-}
 
 COVER_TYPES: dict[str, MotionCoverEntityDescription] = {
     MotionBlindType.ROLLER.value: MotionCoverEntityDescription(),
@@ -95,16 +102,8 @@ async def async_setup_entry(
     """Set up blind based on a config entry."""
     _LOGGER.info("Setting up cover with data %s", entry.data)
 
-    blind = None
-    blind_entity_type = BLIND_TO_ENTITY_TYPE[entry.data[CONF_BLIND_TYPE]]
-    if blind_entity_type == MotionBlindEntityType.POSITION:
-        blind = PositionBlind(entry)
-    elif blind_entity_type == MotionBlindEntityType.POSITION_CURTAIN:
-        blind = PositionCurtainBlind(entry)
-    elif blind_entity_type == MotionBlindEntityType.TILT:
-        blind = TiltBlind(entry)
-    else:
-        blind = PositionTiltBlind(entry)
+    blind_type = BLIND_TO_ENTITY_TYPE[entry.data[CONF_BLIND_TYPE]]
+    blind = blind_type(entry)
     hass.data[DOMAIN][entry.entry_id] = blind
     async_add_entities([blind])
 
@@ -193,6 +192,7 @@ class GenericBlind(CoverEntity):
             if not await self._device.status_query():
                 self._allow_position_feedback = False
 
+    @run_command
     async def async_stop_cover(self, **kwargs: any) -> None:
         """Stop moving the blind."""
         current_stop_click_time = time.time_ns() // 1e6
@@ -214,6 +214,7 @@ class GenericBlind(CoverEntity):
                 self.async_refresh_disconnect_timer()
             self._last_stop_click_time = current_stop_click_time
 
+    @run_command
     async def async_favorite(self, **kwargs: any) -> None:
         """Move the blind to the favorite position."""
         self.async_update_running(MotionRunningType.UNKNOWN)
@@ -257,7 +258,7 @@ class GenericBlind(CoverEntity):
             str(new_position_percentage),
             str(new_angle_percentage),
         )
-        if isinstance(self, PositionCurtainBlind):
+        if isinstance(self, PositionCalibrationBlind):
             self.async_update_calibration(end_position_info)
         self._attr_current_cover_position = 100 - new_position_percentage
         self._attr_current_cover_tilt_position = 100 - new_angle_percentage
@@ -304,12 +305,9 @@ class GenericBlind(CoverEntity):
 
         if self._battery_callback is not None:
             self._battery_callback(battery_percentage)
-        if (
-            self._speed_callback is not None
-            and speed_level is not MotionSpeedLevel.NONE
-        ):
+        if self._speed_callback is not None:
             self._speed_callback(speed_level)
-        if isinstance(self, PositionCurtainBlind):
+        if isinstance(self, PositionCalibrationBlind):
             self.async_update_calibration(end_position_info)
         self.async_write_ha_state()
 
@@ -368,6 +366,7 @@ class PositionBlind(GenericBlind):
         _LOGGER.info("PositionBlind has been added!")
         await super().async_added_to_hass()
 
+    @run_command
     async def async_open_cover(self, **kwargs: any) -> None:
         """Open the blind."""
         _LOGGER.info("Open %s", self.device_address)
@@ -378,6 +377,7 @@ class PositionBlind(GenericBlind):
         else:
             self.async_update_running(MotionRunningType.STILL)
 
+    @run_command
     async def async_close_cover(self, **kwargs: any) -> None:
         """Close the blind."""
         _LOGGER.info("Close %s", self.device_address)
@@ -388,6 +388,7 @@ class PositionBlind(GenericBlind):
         else:
             self.async_update_running(MotionRunningType.STILL)
 
+    @run_command
     async def async_set_cover_position(self, **kwargs: any) -> None:
         """Move the blind to a specific position."""
         new_position = 100 - kwargs.get(ATTR_POSITION)
@@ -423,6 +424,7 @@ class TiltBlind(GenericBlind):
         _LOGGER.info("TiltBlind has been added!")
         await super().async_added_to_hass()
 
+    @run_command
     async def async_open_cover_tilt(self, **kwargs: any) -> None:
         """Tilt the blind open."""
         _LOGGER.info("Open tilt %s", self.device_address)
@@ -433,6 +435,7 @@ class TiltBlind(GenericBlind):
         else:
             self.async_update_running(MotionRunningType.STILL)
 
+    @run_command
     async def async_close_cover_tilt(self, **kwargs: any) -> None:
         """Tilt the blind closed."""
         _LOGGER.info("Close tilt %s", self.device_address)
@@ -443,10 +446,12 @@ class TiltBlind(GenericBlind):
         else:
             self.async_update_running(MotionRunningType.STILL)
 
+    @run_command
     async def async_stop_cover_tilt(self, **kwargs: any) -> None:
         """Stop tilting the blind."""
         await self.async_stop_cover(**kwargs)
 
+    @run_command
     async def async_set_cover_tilt_position(self, **kwargs: any) -> None:
         """Tilt the blind to a specific position."""
         new_tilt_position = 100 - kwargs.get(ATTR_TILT_POSITION)
@@ -489,15 +494,15 @@ class PositionTiltBlind(PositionBlind, TiltBlind):
         await super().async_added_to_hass()
 
 
-class PositionCurtainBlind(PositionBlind):
-    """Representation of a curtain blind."""
+class PositionCalibrationBlind(PositionBlind):
+    """Representation of a blind with position & calibration capabilities."""
 
     _calibration_type: MotionCalibrationType = None
     _calibration_callback: Callable[[MotionCalibrationType], None] = None
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
-        _LOGGER.info("PositionCurtainBlind has been added!")
+        _LOGGER.info("PositionCalibrationBlind has been added!")
         await super().async_added_to_hass()
 
     def async_update_running(self, running_type: MotionRunningType) -> None:
@@ -517,13 +522,14 @@ class PositionCurtainBlind(PositionBlind):
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
         """Update the calibration status of the motor."""
         _LOGGER.info("Calibrated: %s", end_position_info.UP)
+        _LOGGER.warning("Self: %s", self._running_type)
         new_calibration_type = (
             MotionCalibrationType.CALIBRATED  # Calibrated if end positions are set
             if end_position_info.UP
-            else MotionCalibrationType.UNCALIBRATED  # Uncalibrated if no end positions, and motor is not running
+            else MotionCalibrationType.CALIBRATING  # Calibrating if no end positions, and motor is running
             if self._running_type is not None
             and self._running_type is not MotionRunningType.STILL
-            else MotionCalibrationType.CALIBRATING
+            else MotionCalibrationType.UNCALIBRATED
         )
         _LOGGER.warning(new_calibration_type)
 
@@ -553,3 +559,51 @@ class PositionCurtainBlind(PositionBlind):
             # Set calibration to None if disconnected
             self._calibration_callback(None)
         super().async_update_connection(connection_type)
+
+
+class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
+    """Representation of a blind with position, tilt and calibration capabilities."""
+
+    _calibration_event: Event = Event()
+
+    async def async_added_to_hass(self) -> None:
+        """Run when entity about to be added."""
+        _LOGGER.info("PositionTiltCalibrationBlind has been added!")
+        await super().async_added_to_hass()
+
+    # Decorator function called before every run command
+    async def before_run_command(self, **kwargs):
+        """Run before every command that moves a blind, returns whether or not to proceed with the command."""
+        if not self._device.is_connected():
+            self._calibration_event.clear()
+            if not await self.async_connect():
+                return False
+            # Wait for calibration attribute to get a value
+            await self._calibration_event.wait()
+        # If motor is not calibrated, raise an exception
+        if self._calibration_type is not MotionCalibrationType.CALIBRATED:
+            raise NotCalibratedException(
+                f"{self._attr_name} needs to be calibrated using the MotionBlinds BLE app before usage."
+            )
+        return True
+
+    @callback
+    def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
+        super().async_update_calibration(end_position_info)
+        self._calibration_event.set()
+
+
+class NotCalibratedException(Exception):
+    """Exception to indicate the blinds are not calibrated."""
+
+
+BLIND_TO_ENTITY_TYPE: dict[str, GenericBlind] = {
+    MotionBlindType.ROLLER.value: PositionBlind,
+    MotionBlindType.HONEYCOMB.value: PositionBlind,
+    MotionBlindType.ROMAN.value: PositionBlind,
+    MotionBlindType.VENETIAN.value: PositionTiltBlind,
+    MotionBlindType.VENETIAN_TILT_ONLY.value: TiltBlind,
+    MotionBlindType.DOUBLE_ROLLER.value: PositionTiltBlind,
+    MotionBlindType.CURTAIN.value: PositionCalibrationBlind,
+    MotionBlindType.VERTICAL.value: PositionTiltCalibrationBlind,
+}
