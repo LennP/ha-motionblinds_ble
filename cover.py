@@ -596,7 +596,7 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
 
     async def async_connect(self) -> bool:
         """Connect to the blind, add a delay before sending the status query."""
-        await super().async_connect(notification_delay=True)
+        return await super().async_connect(notification_delay=True)
 
 
 class NotCalibratedException(Exception):
