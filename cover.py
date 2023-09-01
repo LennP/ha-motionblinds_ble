@@ -54,20 +54,44 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # Decorator used to perform checks before executing a command
-DECORATOR_FUNCTION = "before_run_command"
+DECORATOR_METHOD_BEFORE_RUN = "before_run_command"
+DECORATOR_METHOD_AFTER_RUN = "after_run_command"
+DECORATOR_METHOD_BEFORE_NO_RUN = "before_no_run_command"
+DECORATOR_METHOD_AFTER_NO_RUN = "after_no_run_command"
 
 
-def run_command(func):
+def generic_command_decorator(
+    before_method_name: str, after_method_name: str, func: Callable
+) -> Callable:
     async def wrapper(self, *args, **kwargs):
         # Check if the object has an attribute named DECORATOR_FUNCTION
-        if hasattr(self, DECORATOR_FUNCTION):
+        if hasattr(self, before_method_name):
             # Get the attribute and call it
-            before_func = getattr(self, DECORATOR_FUNCTION)
+            before_func = getattr(self, before_method_name)
             if not await before_func(*args, **kwargs):
                 return  # Don't execute function if before_func returns False
-        return await func(self, *args, **kwargs)
+        res = await func(self, *args, **kwargs)
+        if hasattr(self, after_method_name):
+            # Get the attribute and call it
+            after_func = getattr(self, after_method_name)
+            await after_func(*args, **kwargs)
+        return res
 
     return wrapper
+
+
+# Decorator used for commands that move the motor position
+def run_command(func: Callable) -> Callable:
+    return generic_command_decorator(
+        DECORATOR_METHOD_BEFORE_RUN, DECORATOR_METHOD_AFTER_RUN, func
+    )
+
+
+# Decorator used for commands that do not move the motor position
+def no_run_command(func: Callable) -> Callable:
+    return generic_command_decorator(
+        DECORATOR_METHOD_BEFORE_NO_RUN, DECORATOR_METHOD_AFTER_NO_RUN, func
+    )
 
 
 @dataclass
@@ -119,7 +143,7 @@ class GenericBlind(CoverEntity):
     _running_type: MotionRunningType = None
 
     _last_stop_click_time: int = None
-    _allow_position_feedback: bool = False
+    _use_status_position_update_ui: bool = False
 
     _battery_callback: Callable[[int], None] = None
     _speed_callback: Callable[[MotionSpeedLevel], None] = None
@@ -174,24 +198,22 @@ class GenericBlind(CoverEntity):
         """Refresh the time before the blind is disconnected."""
         self._device.refresh_disconnect_timer(timeout, force)
 
+    @no_run_command
     async def async_connect(self, notification_delay: bool = False) -> bool:
         """Connect to the blind."""
-        connected = False
-        if self._device:
-            connected = await self._device.connect()
-        return connected
+        return await self._device.connect(notification_delay)
 
     async def async_disconnect(self, **kwargs: any) -> None:
         """Disconnect the blind."""
-        if self._device:
-            await self._device.disconnect()
+        self._use_status_position_update_ui = False
+        await self._device.disconnect()
 
+    @no_run_command
     async def async_status_query(self, **kwargs: any) -> None:
         """Send a status query to the blind."""
-        if self._device:
-            self._allow_position_feedback = True
-            if not await self._device.status_query():
-                self._allow_position_feedback = False
+        self._use_status_position_update_ui = True
+        if await self._device.status_query():
+            self._use_status_position_update_ui = False
 
     @run_command
     async def async_stop_cover(self, **kwargs: any) -> None:
@@ -205,14 +227,12 @@ class GenericBlind(CoverEntity):
         ):
             # Favorite
             _LOGGER.info("Favorite %s", self.device_address)
-            if await self._device.favorite():
-                self.async_refresh_disconnect_timer()
+            await self._device.favorite()
             self._last_stop_click_time = None
         else:
             # Stop
             _LOGGER.info("Stop %s", self.device_address)
-            if await self._device.stop():
-                self.async_refresh_disconnect_timer()
+            await self._device.stop()
             self._last_stop_click_time = current_stop_click_time
 
     @run_command
@@ -220,14 +240,13 @@ class GenericBlind(CoverEntity):
         """Move the blind to the favorite position."""
         self.async_update_running(MotionRunningType.UNKNOWN)
         _LOGGER.info("Favorite %s", self.device_address)
-        if await self._device.favorite():
-            self.async_refresh_disconnect_timer()
+        await self._device.favorite()
 
+    @no_run_command
     async def async_speed(self, speed_level: MotionSpeedLevel, **kwargs: any) -> None:
         """Change the speed level of the device."""
         _LOGGER.info("Speed %s", self.device_address)
-        if await self._device.speed(speed_level):
-            self.async_refresh_disconnect_timer()
+        await self._device.speed(speed_level)
 
     def async_update_running(self, running_type: MotionRunningType) -> None:
         """Used to update whether the blind is running (opening/closing) or not."""
@@ -276,6 +295,7 @@ class GenericBlind(CoverEntity):
             self._connection_callback(connection_type)
         # Reset states if connection is lost, since we don't know the cover position anymore
         if connection_type is MotionConnectionType.DISCONNECTED:
+            self._use_status_position_update_ui = False
             self._attr_is_opening = False
             self._attr_is_closing = False
             self._attr_is_closed = None
@@ -298,11 +318,11 @@ class GenericBlind(CoverEntity):
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
         # Only update position based on feedback when necessary, otherwise cover UI will jump around
-        if self._allow_position_feedback:
+        if self._use_status_position_update_ui:
             _LOGGER.info("Using position feedback once")
             self._attr_current_cover_position = 100 - position_percentage
             self._attr_current_cover_tilt_position = 100 - tilt_percentage
-            self._allow_position_feedback = False
+            self._use_status_position_update_ui = False
 
         if self._battery_callback is not None:
             self._battery_callback(battery_percentage)
@@ -351,6 +371,24 @@ class GenericBlind(CoverEntity):
         """Return the state attributes."""
         return {ATTR_CONNECTION_TYPE: self._attr_connection_type}
 
+    async def before_command(self, **kwargs) -> None:
+        if self._attr_connection_type is MotionConnectionType.CONNECTED:
+            self.async_refresh_disconnect_timer()
+
+    # Decorator
+    async def before_run_command(self, **kwargs) -> bool:
+        await self.before_command(**kwargs)
+        if self._attr_connection_type is MotionConnectionType.DISCONNECTED:
+            self._use_status_position_update_ui = False
+        return True
+
+    # Decorator
+    async def before_no_run_command(self, **kwargs) -> bool:
+        await self.before_command(**kwargs)
+        if self._attr_connection_type is MotionConnectionType.DISCONNECTED:
+            self._use_status_position_update_ui = True
+        return True
+
 
 class PositionBlind(GenericBlind):
     """Representation of a blind with position capability."""
@@ -373,7 +411,6 @@ class PositionBlind(GenericBlind):
         _LOGGER.info("Open %s", self.device_address)
         self.async_update_running(MotionRunningType.OPENING)
         if await self._device.open():
-            self.async_refresh_disconnect_timer()
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -384,7 +421,6 @@ class PositionBlind(GenericBlind):
         _LOGGER.info("Close %s", self.device_address)
         self.async_update_running(MotionRunningType.CLOSING)
         if await self._device.close():
-            self.async_refresh_disconnect_timer()
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -404,7 +440,6 @@ class PositionBlind(GenericBlind):
             else MotionRunningType.CLOSING
         )
         if await self._device.percentage(new_position):
-            self.async_refresh_disconnect_timer()
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -431,7 +466,6 @@ class TiltBlind(GenericBlind):
         _LOGGER.info("Open tilt %s", self.device_address)
         self.async_update_running(MotionRunningType.OPENING)
         if await self._device.open_tilt():
-            self.async_refresh_disconnect_timer()
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -442,7 +476,6 @@ class TiltBlind(GenericBlind):
         _LOGGER.info("Close tilt %s", self.device_address)
         self.async_update_running(MotionRunningType.CLOSING)
         if await self._device.close_tilt():
-            self.async_refresh_disconnect_timer()
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -469,7 +502,6 @@ class TiltBlind(GenericBlind):
             else MotionRunningType.CLOSING
         )
         if await self._device.percentage_tilt(new_tilt_position):
-            self.async_refresh_disconnect_timer()
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -561,6 +593,10 @@ class PositionCalibrationBlind(PositionBlind):
             self._calibration_callback(None)
         super().async_update_connection(connection_type)
 
+    async def async_connect(self) -> bool:
+        """Connect to the blind, add a delay before sending the status query."""
+        return await super().async_connect(notification_delay=True)
+
 
 class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
     """Representation of a blind with position, tilt and calibration capabilities."""
@@ -574,7 +610,8 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
 
     # Decorator function called before every run command
     async def before_run_command(self, **kwargs):
-        """Run before every command that moves a blind, returns whether or not to proceed with the command."""
+        """Run before every command that moves a blind, return whether or not to proceed with the command."""
+        await super().before_run_command()
         if not self._device.is_connected():
             self._calibration_event.clear()
             if not await self.async_connect():
@@ -593,10 +630,6 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
         """Update the calibration status of the motor."""
         super().async_update_calibration(end_position_info)
         self._calibration_event.set()
-
-    async def async_connect(self) -> bool:
-        """Connect to the blind, add a delay before sending the status query."""
-        return await super().async_connect(notification_delay=True)
 
 
 class NotCalibratedException(Exception):
