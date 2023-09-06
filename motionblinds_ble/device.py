@@ -341,6 +341,7 @@ class MotionDevice:
                 return True
             except BleakError as e:
                 if number_of_tries == SETTING_MAX_COMMAND_ATTEMPTS:
+                    await self.disconnect()
                     raise e
                 else:
                     _LOGGER.warning(
