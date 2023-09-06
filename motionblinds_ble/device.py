@@ -330,15 +330,18 @@ class MotionDevice:
         number_of_tries = 0
         while number_of_tries < SETTING_MAX_COMMAND_ATTEMPTS:
             try:
-                a = time()
-                await self._current_bleak_client.write_gatt_char(
-                    str(MotionCharacteristic.COMMAND.value),
-                    bytes.fromhex(command),
-                    response=True,
-                )
-                b = time()
-                _LOGGER.warning("Received response in %ss", str(b - a))
-                return True
+                if self._current_bleak_client is not None:
+                    a = time()
+                    await self._current_bleak_client.write_gatt_char(
+                        str(MotionCharacteristic.COMMAND.value),
+                        bytes.fromhex(command),
+                        response=True,
+                    )
+                    b = time()
+                    _LOGGER.warning("Received response in %ss", str(b - a))
+                    return True
+                else:
+                    return False
             except BleakError as e:
                 if number_of_tries == SETTING_MAX_COMMAND_ATTEMPTS:
                     await self.disconnect()
