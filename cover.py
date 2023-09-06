@@ -611,7 +611,7 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
     # Decorator
     async def before_run_command(self, *args, **kwargs):
         """Run before every command that moves a blind, return whether or not to proceed with the command."""
-        await super().before_run_command()
+        await super().before_run_command(args, **kwargs)
         if not self._device.is_connected():
             self._calibration_event.clear()
             if not await self.async_connect():
