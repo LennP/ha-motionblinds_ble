@@ -198,9 +198,9 @@ class GenericBlind(CoverEntity):
         """Refresh the time before the blind is disconnected."""
         self._device.refresh_disconnect_timer(timeout, force)
 
-    @no_run_command
     async def async_connect(self, notification_delay: bool = False) -> bool:
         """Connect to the blind."""
+        self._use_status_position_update_ui = True
         return await self._device.connect(notification_delay)
 
     async def async_disconnect(self, **kwargs: any) -> None:
@@ -378,14 +378,14 @@ class GenericBlind(CoverEntity):
     # Decorator
     async def before_run_command(self, *args, **kwargs) -> bool:
         await self.before_command(*args, **kwargs)
-        if self._attr_connection_type is MotionConnectionType.DISCONNECTED:
+        if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = False
         return True
 
     # Decorator
     async def before_no_run_command(self, *args, **kwargs) -> bool:
         await self.before_command(*args, **kwargs)
-        if self._attr_connection_type is MotionConnectionType.DISCONNECTED:
+        if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = True
         return True
 
