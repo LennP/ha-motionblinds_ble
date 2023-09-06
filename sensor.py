@@ -1,7 +1,9 @@
 """Sensor entities for the MotionBlinds BLE integration."""
 
 import logging
+from math import ceil
 
+from homeassistant.components.bluetooth.wrappers import BLEDevice
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -12,7 +14,6 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
-from homeassistant.components.bluetooth.wrappers import BLEDevice
 
 from .const import (
     ATTR_BATTERY,
@@ -112,9 +113,26 @@ class BatterySensor(SensorEntity):
     @callback
     def async_update_battery_percentage(self, battery_percentage: int) -> None:
         """Update the battery percentage sensor value."""
-        self._attr_native_value = (
-            str(battery_percentage) if battery_percentage else None
-        )
+        if battery_percentage is None:
+            self._attr_native_value = None
+            self._attr_icon = "mdi:battery-unknown"
+        elif battery_percentage == 0xFF:
+            self._attr_native_value = "100"
+            self._attr_icon = "mdi:power-plug-outline"
+        else:
+            is_charging = bool(battery_percentage & 0x80)
+            battery_percentage = battery_percentage & 0x7F
+            battery_icon_prefix = (
+                "mdi:battery-charging" if is_charging else "mdi:battery"
+            )
+            self._attr_native_value = (
+                str(battery_percentage) if battery_percentage else None
+            )
+            battery_percentage_multiple_ten = ceil(battery_percentage / 10) * 10
+            self._attr_icon = f"{battery_icon_prefix}-{battery_percentage_multiple_ten}"
+            self._attr_native_value = (
+                str(battery_percentage) if battery_percentage else None
+            )
         self.async_write_ha_state()
 
 
