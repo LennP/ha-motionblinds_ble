@@ -371,20 +371,20 @@ class GenericBlind(CoverEntity):
         """Return the state attributes."""
         return {ATTR_CONNECTION_TYPE: self._attr_connection_type}
 
-    async def before_command(self, **kwargs) -> None:
+    async def before_command(self, *args, **kwargs) -> None:
         if self._attr_connection_type is MotionConnectionType.CONNECTED:
             self.async_refresh_disconnect_timer()
 
     # Decorator
-    async def before_run_command(self, **kwargs) -> bool:
-        await self.before_command(**kwargs)
+    async def before_run_command(self, *args, **kwargs) -> bool:
+        await self.before_command(*args, **kwargs)
         if self._attr_connection_type is MotionConnectionType.DISCONNECTED:
             self._use_status_position_update_ui = False
         return True
 
     # Decorator
-    async def before_no_run_command(self, **kwargs) -> bool:
-        await self.before_command(**kwargs)
+    async def before_no_run_command(self, *args, **kwargs) -> bool:
+        await self.before_command(*args, **kwargs)
         if self._attr_connection_type is MotionConnectionType.DISCONNECTED:
             self._use_status_position_update_ui = True
         return True
@@ -608,8 +608,8 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
         _LOGGER.info("PositionTiltCalibrationBlind has been added!")
         await super().async_added_to_hass()
 
-    # Decorator function called before every run command
-    async def before_run_command(self, **kwargs):
+    # Decorator
+    async def before_run_command(self, *args, **kwargs):
         """Run before every command that moves a blind, return whether or not to proceed with the command."""
         await super().before_run_command()
         if not self._device.is_connected():
