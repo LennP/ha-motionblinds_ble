@@ -7,6 +7,13 @@ SETTING_DISCONNECT_TIME = 15  # Seconds
 SETTING_CALIBRATION_DISCONNECT_TIME = 45  # Seconds
 SETTING_NOTIFICATION_DELAY = 0.5  # Seconds
 
+EXCEPTION_NO_END_POSITIONS = (
+    "The motor's end positions need to be set before usage of this command."
+)
+EXCEPTION_NO_FAVORITE_POSITION = (
+    "The motor's favorite position needs to be set before usage of this command."
+)
+
 
 class MotionService(StrEnum):
     CONTROL = "d973f2e0-b19e-11e2-9e96-0800200c9a66"

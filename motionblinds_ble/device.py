@@ -1,4 +1,6 @@
 """Device for MotionBlinds BLE."""
+from __future__ import annotations
+
 import logging
 from asyncio import (
     CancelledError,
@@ -20,6 +22,8 @@ from bleak.exc import BleakError
 from bleak_retry_connector import BleakOutOfConnectionSlotsError, establish_connection
 
 from .const import (
+    EXCEPTION_NO_END_POSITIONS,
+    EXCEPTION_NO_FAVORITE_POSITION,
     SETTING_DISCONNECT_TIME,
     SETTING_MAX_COMMAND_ATTEMPTS,
     SETTING_MAX_CONNECT_ATTEMPTS,
@@ -36,6 +40,37 @@ from .crypt import MotionCrypt
 _LOGGER = logging.getLogger(__name__)
 
 
+def requires_end_positions(func: Callable) -> Callable:
+    async def wrapper(self: MotionDevice, *args, **kwargs):
+        if self.end_position_info is not None and not self.end_position_info.UP:
+            raise NoEndPositionsException(EXCEPTION_NO_END_POSITIONS)
+        return await func(self, *args, **kwargs)
+
+    return wrapper
+
+
+def requires_favorite_position(func: Callable) -> Callable:
+    async def wrapper(self: MotionDevice, *args, **kwargs):
+        if (
+            self.end_position_info is not None
+            and not self.end_position_info.UP
+            and not self.end_position_info.FAVORITE
+        ):
+            raise NoFavoritePositionException(EXCEPTION_NO_FAVORITE_POSITION)
+        return await func(self, *args, **kwargs)
+
+    return wrapper
+
+
+def requires_connection(func: Callable) -> Callable:
+    async def wrapper(self: MotionDevice, *args, **kwargs):
+        if not await self.connect():
+            return False
+        return await func(self, *args, **kwargs)
+
+    return wrapper
+
+
 @dataclass
 class MotionPositionInfo:
     def __init__(self, end_positions_byte: int, favorite_bytes: int) -> None:
@@ -49,6 +84,7 @@ class MotionPositionInfo:
 
 
 class MotionDevice:
+    end_position_info: MotionPositionInfo = None
     _device_address: str = None
     _ble_device: BLEDevice = None
     _current_bleak_client: BleakClient = None
@@ -71,10 +107,10 @@ class MotionDevice:
     _connection_task: Task = None
     _last_connection_caller_time: int = None
 
-    def __init__(self, _address: str, _ble_device: BLEDevice = None) -> None:
-        self._device_address = _address
-        if _ble_device:
-            self._ble_device = _ble_device
+    def __init__(self, device_address: str, ble_device: BLEDevice = None) -> None:
+        self._device_address = device_address
+        if ble_device:
+            self._ble_device = ble_device
         else:
             _LOGGER.warning(
                 "Could not find BLEDevice, creating new BLEDevice from address"
@@ -160,7 +196,7 @@ class MotionDevice:
             and self._position_callback is not None
         ):
             _LOGGER.info("Position notification")
-            end_position_info: MotionPositionInfo = MotionPositionInfo(
+            self.end_position_info: MotionPositionInfo = MotionPositionInfo(
                 decrypted_message_bytes[4],
                 int.from_bytes(
                     [decrypted_message_bytes[6], decrypted_message_bytes[7]]
@@ -170,7 +206,7 @@ class MotionDevice:
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
             self._position_callback(
-                position_percentage, angle_percentage, end_position_info
+                position_percentage, angle_percentage, self.end_position_info
             )
         elif (
             decrypted_message.startswith(MotionNotificationType.RUNNING.value)
@@ -189,7 +225,7 @@ class MotionDevice:
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
             battery_percentage: int = decrypted_message_bytes[17]
-            end_position_info: MotionPositionInfo = MotionPositionInfo(
+            self.end_position_info: MotionPositionInfo = MotionPositionInfo(
                 decrypted_message_bytes[4],
                 int.from_bytes(
                     [decrypted_message_bytes[6], decrypted_message_bytes[7]]
@@ -206,7 +242,7 @@ class MotionDevice:
                 angle_percentage,
                 battery_percentage,
                 speed_level,
-                end_position_info,
+                self.end_position_info,
             )
 
     def _disconnect_callback(self, client: BleakClient) -> None:
@@ -215,11 +251,11 @@ class MotionDevice:
         self.set_connection(MotionConnectionType.DISCONNECTED)
         self._current_bleak_client = None
 
-    async def connect(self, notification_delay: bool = False) -> bool:
+    async def connect(self, use_notification_delay: bool = False) -> bool:
         """Connect to the device if not connected, return whether or not the motor is ready for a command."""
         if not self.is_connected():
             # Connect if not connected yet and not busy connecting
-            return await self._connect_if_not_connecting(notification_delay)
+            return await self._connect_if_not_connecting(use_notification_delay)
         else:
             self.refresh_disconnect_timer()
         return True
@@ -240,7 +276,7 @@ class MotionDevice:
         self.set_connection(MotionConnectionType.DISCONNECTED)
 
     async def _connect_if_not_connecting(
-        self, notification_delay: bool = False
+        self, use_notification_delay: bool = False
     ) -> bool:
         """Connect if no connection is currently attempted, return True if the motor is ready for a command and only to the last caller."""
         # Don't try to connect if we are already connecting
@@ -251,12 +287,12 @@ class MotionDevice:
             if self._ha_create_task:
                 _LOGGER.warning("HA connecting")
                 self._connection_task = self._ha_create_task(
-                    target=self._connect(notification_delay)
+                    target=self._connect(use_notification_delay)
                 )
             else:
                 _LOGGER.warning("Normal connecting")
                 self._connection_task = get_event_loop().create_task(
-                    self._connect(notification_delay)
+                    self._connect(use_notification_delay)
                 )
         else:
             _LOGGER.info("Already connecting, waiting for connection")
@@ -280,7 +316,7 @@ class MotionDevice:
         )
         return is_last_caller  # Return whether or not this function was the last caller
 
-    async def _connect(self, notification_delay: bool = False) -> bool:
+    async def _connect(self, use_notification_delay: bool = False) -> bool:
         """Connect to the device, return whether or not the motor is ready for a command."""
         if self._connection_type is MotionConnectionType.CONNECTING:
             return False
@@ -308,7 +344,7 @@ class MotionDevice:
         # Used to initialize
         await self.set_key()
 
-        if notification_delay:
+        if use_notification_delay:
             await sleep(SETTING_NOTIFICATION_DELAY)
         # Set the point (used after calibrating Curtain)
         # await self.point_set_query()
@@ -330,8 +366,6 @@ class MotionDevice:
         self, command_prefix: str, connection_command: bool = False
     ) -> bool:
         """Write a message to the command characteristic, return whether or not the command was successfully executed."""
-        if not await self.connect():
-            return False
         # Command must be generated just before sending due get_time timing
         command = MotionCrypt.encrypt(command_prefix + MotionCrypt.get_time())
         _LOGGER.warning("Sending message: %s", MotionCrypt.decrypt(command))
@@ -362,26 +396,40 @@ class MotionDevice:
                     )
                     number_of_tries += 1
 
+    @requires_connection
     async def user_query(self) -> bool:
         """Send user_query command."""
         command_prefix = str(MotionCommandType.USER_QUERY.value)
         return await self._send_command(command_prefix, connection_command=True)
 
+    @requires_connection
     async def set_key(self) -> bool:
         """Send set_key command."""
         command_prefix = str(MotionCommandType.SET_KEY.value)
         return await self._send_command(command_prefix, connection_command=True)
 
+    @requires_connection
     async def status_query(self) -> bool:
         """Send status_query command."""
         command_prefix = str(MotionCommandType.STATUS_QUERY.value)
         return await self._send_command(command_prefix, connection_command=True)
 
+    @requires_connection
     async def point_set_query(self) -> bool:
         """Send point_set_query command."""
         command_prefix = str(MotionCommandType.POINT_SET_QUERY.value)
         return await self._send_command(command_prefix, connection_command=True)
 
+    @requires_connection
+    async def speed(self, speed_level: MotionSpeedLevel) -> bool:
+        """Change the speed level of the device."""
+        command_prefix = str(MotionCommandType.SPEED.value) + hex(
+            int(speed_level.value)
+        )[2:].zfill(2)
+        return await self._send_command(command_prefix)
+
+    @requires_connection
+    @requires_end_positions
     async def percentage(self, percentage: int) -> bool:
         """Moves the device to a specific percentage."""
         assert not percentage < 0 and not percentage > 100
@@ -390,33 +438,36 @@ class MotionDevice:
         )
         return await self._send_command(command_prefix)
 
+    @requires_connection
+    @requires_end_positions
     async def open(self) -> bool:
         """Open the device."""
         command_prefix = str(MotionCommandType.OPEN.value)
         return await self._send_command(command_prefix)
 
+    @requires_connection
+    @requires_end_positions
     async def close(self) -> bool:
         """Close the device."""
         command_prefix = str(MotionCommandType.CLOSE.value)
         return await self._send_command(command_prefix)
 
+    @requires_connection
+    @requires_end_positions
     async def stop(self) -> bool:
         """Stop moving the device."""
         command_prefix = str(MotionCommandType.STOP.value)
         return await self._send_command(command_prefix)
 
+    @requires_connection
+    @requires_favorite_position
     async def favorite(self) -> bool:
         """Move the device to the favorite position."""
         command_prefix = str(MotionCommandType.FAVORITE.value)
         return await self._send_command(command_prefix)
 
-    async def speed(self, speed_level: MotionSpeedLevel) -> bool:
-        """Change the speed level of the device."""
-        command_prefix = str(MotionCommandType.SPEED.value) + hex(
-            int(speed_level.value)
-        )[2:].zfill(2)
-        return await self._send_command(command_prefix)
-
+    @requires_connection
+    @requires_end_positions
     async def percentage_tilt(self, percentage: int) -> bool:
         """Tilt the device to a specific position."""
         angle = round(180 * percentage / 100)
@@ -425,6 +476,8 @@ class MotionDevice:
         )
         return await self._send_command(command_prefix)
 
+    @requires_connection
+    @requires_end_positions
     async def open_tilt(self) -> bool:
         """Tilt the device open."""
         # Step or fully tilt?
@@ -432,6 +485,8 @@ class MotionDevice:
         command_prefix = str(MotionCommandType.ANGLE.value) + "00" + hex(0)[2:].zfill(2)
         return await self._send_command(command_prefix)
 
+    @requires_connection
+    @requires_end_positions
     async def close_tilt(self) -> bool:
         """Tilt the device closed."""
         # Step or fully tilt?
@@ -460,3 +515,11 @@ class MotionDevice:
     ) -> None:
         """Register the callback used to update the motor status, e.g. position, tilt and battery percentage."""
         self._status_callback = callback
+
+
+class NoEndPositionsException(Exception):
+    """Exception to indicate the blind's endpositions must be set."""
+
+
+class NoFavoritePositionException(Exception):
+    """Exception to indicate the blind's favorite must be set."""
