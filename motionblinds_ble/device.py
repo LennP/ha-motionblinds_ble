@@ -19,7 +19,11 @@ from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
 from bleak.backends.device import BLEDevice
 from bleak.exc import BleakError
-from bleak_retry_connector import BleakOutOfConnectionSlotsError, establish_connection
+from bleak_retry_connector import (
+    BleakNotFoundError,
+    BleakOutOfConnectionSlotsError,
+    establish_connection,
+)
 
 from .const import (
     EXCEPTION_NO_END_POSITIONS,
@@ -133,7 +137,7 @@ class MotionDevice:
         """Set the call_later function to use."""
         self._ha_call_later = ha_call_later
 
-    def set_connection(self, connection_type: MotionConnectionType) -> None:
+    def _set_connection(self, connection_type: MotionConnectionType) -> None:
         """Set the connection to a particular connection type."""
         if self._connection_callback:
             self._connection_callback(connection_type)
@@ -248,7 +252,7 @@ class MotionDevice:
     def _disconnect_callback(self, client: BleakClient) -> None:
         """Callback called by Bleak when a client disconnects."""
         _LOGGER.info("Device %s disconnected!", self._device_address)
-        self.set_connection(MotionConnectionType.DISCONNECTED)
+        self._set_connection(MotionConnectionType.DISCONNECTED)
         self._current_bleak_client = None
 
     async def connect(self, use_notification_delay: bool = False) -> bool:
@@ -262,7 +266,7 @@ class MotionDevice:
 
     async def disconnect(self) -> None:
         """Called by Home Assistant after X time."""
-        self.set_connection(MotionConnectionType.DISCONNECTING)
+        self._set_connection(MotionConnectionType.DISCONNECTING)
         if self._connection_task is not None:
             _LOGGER.info("Cancelling connecting %s", self._device_address)
             self._connection_task.cancel()  # Indicate the connection has failed.
@@ -273,7 +277,7 @@ class MotionDevice:
             self._cancel_disconnect_timer()
             await self._current_bleak_client.disconnect()
             self._current_bleak_client = None
-        self.set_connection(MotionConnectionType.DISCONNECTED)
+        self._set_connection(MotionConnectionType.DISCONNECTED)
 
     async def _connect_if_not_connecting(
         self, use_notification_delay: bool = False
@@ -299,15 +303,13 @@ class MotionDevice:
         try:
             if not await self._connection_task:
                 return False
-        except BleakOutOfConnectionSlotsError as e:
-            # Return False if connecting has been cancelled
-            _LOGGER.info("Cancelled connecting due to lack of connection slots")
-            self.set_connection(MotionConnectionType.DISCONNECTED)
+        except BleakOutOfConnectionSlotsError | BleakNotFoundError as e:
+            self._set_connection(MotionConnectionType.DISCONNECTED)
             raise e
         except CancelledError:
             # Return False if connecting has been cancelled
             _LOGGER.info("Cancelled connecting")
-            self.set_connection(MotionConnectionType.DISCONNECTED)
+            self._set_connection(MotionConnectionType.DISCONNECTED)
             return False
 
         self._connection_task = None
@@ -321,7 +323,7 @@ class MotionDevice:
         if self._connection_type is MotionConnectionType.CONNECTING:
             return False
 
-        self.set_connection(MotionConnectionType.CONNECTING)
+        self._set_connection(MotionConnectionType.CONNECTING)
         _LOGGER.info("Connecting to %s", self._device_address)
 
         _LOGGER.info("Establishing connection")
@@ -334,7 +336,7 @@ class MotionDevice:
 
         _LOGGER.info("Connected to %s", self._device_address)
         self._current_bleak_client = bleak_client
-        self.set_connection(MotionConnectionType.CONNECTED)
+        self._set_connection(MotionConnectionType.CONNECTED)
 
         await bleak_client.start_notify(
             str(MotionCharacteristic.NOTIFICATION.value),
