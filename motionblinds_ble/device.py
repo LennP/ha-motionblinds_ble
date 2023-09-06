@@ -38,12 +38,14 @@ _LOGGER = logging.getLogger(__name__)
 
 @dataclass
 class MotionPositionInfo:
-    def __init__(self, end_positions_byte: int) -> None:
+    def __init__(self, end_positions_byte: int, favorite_bytes: int) -> None:
         self.UP = bool(end_positions_byte & 0x08)
         self.DOWN = bool(end_positions_byte & 0x04)
+        self.FAVORITE = (favorite_bytes & 0xFF00) != 0x00 or (favorite_bytes & 0x00FF)
 
     UP: bool
     DOWN: bool
+    FAVORITE: bool
 
 
 class MotionDevice:
@@ -159,7 +161,10 @@ class MotionDevice:
         ):
             _LOGGER.info("Position notification")
             end_position_info: MotionPositionInfo = MotionPositionInfo(
-                decrypted_message_bytes[4]
+                decrypted_message_bytes[4],
+                int.from_bytes(
+                    [decrypted_message_bytes[6], decrypted_message_bytes[7]]
+                ),
             )
             position_percentage: int = decrypted_message_bytes[6]
             angle: int = decrypted_message_bytes[7]
@@ -184,7 +189,12 @@ class MotionDevice:
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
             battery_percentage: int = decrypted_message_bytes[17]
-            end_position_info = MotionPositionInfo(decrypted_message_bytes[4])
+            end_position_info: MotionPositionInfo = MotionPositionInfo(
+                decrypted_message_bytes[4],
+                int.from_bytes(
+                    [decrypted_message_bytes[6], decrypted_message_bytes[7]]
+                ),
+            )
             try:
                 speed_level: MotionSpeedLevel = MotionSpeedLevel(
                     decrypted_message_bytes[12]
