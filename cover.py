@@ -7,47 +7,29 @@ from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import partial
 
-from homeassistant.components.bluetooth import (
-    BluetoothCallbackMatcher,
-    BluetoothChange,
-    BluetoothScanningMode,
-    BluetoothServiceInfoBleak,
-    async_ble_device_from_address,
-    async_register_callback,
-)
-from homeassistant.components.cover import (
-    ATTR_POSITION,
-    ATTR_TILT_POSITION,
-    CoverDeviceClass,
-    CoverEntity,
-    CoverEntityDescription,
-    CoverEntityFeature,
-)
+from homeassistant.components.bluetooth import (BluetoothCallbackMatcher,
+                                                BluetoothChange,
+                                                BluetoothScanningMode,
+                                                BluetoothServiceInfoBleak,
+                                                async_ble_device_from_address,
+                                                async_register_callback)
+from homeassistant.components.cover import (ATTR_POSITION, ATTR_TILT_POSITION,
+                                            CoverDeviceClass, CoverEntity,
+                                            CoverEntityDescription,
+                                            CoverEntityFeature)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
 
-from .const import (
-    ATTR_CONNECTION_TYPE,
-    CONF_ADDRESS,
-    CONF_BLIND_TYPE,
-    CONF_MAC_CODE,
-    DOMAIN,
-    ENTITY_NAME,
-    EXCEPTION_NOT_CALIBRATED,
-    MANUFACTURER,
-    SETTING_DOUBLE_CLICK_TIME,
-    MotionBlindType,
-    MotionCalibrationType,
-    MotionRunningType,
-)
-from .motionblinds_ble.const import (
-    SETTING_CALIBRATION_DISCONNECT_TIME,
-    MotionConnectionType,
-    MotionSpeedLevel,
-)
+from .const import (ATTR_CONNECTION_TYPE, CONF_ADDRESS, CONF_BLIND_TYPE,
+                    CONF_MAC_CODE, DOMAIN, ENTITY_NAME,
+                    EXCEPTION_NOT_CALIBRATED, ICON_VERTICAL_BLIND,
+                    MANUFACTURER, SETTING_DOUBLE_CLICK_TIME, MotionBlindType,
+                    MotionCalibrationType, MotionRunningType)
+from .motionblinds_ble.const import (SETTING_CALIBRATION_DISCONNECT_TIME,
+                                     MotionConnectionType, MotionSpeedLevel)
 from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
@@ -105,7 +87,7 @@ COVER_TYPES: dict[str, MotionCoverEntityDescription] = {
         device_class=CoverDeviceClass.CURTAIN
     ),
     MotionBlindType.VERTICAL.value: MotionCoverEntityDescription(
-        device_class=CoverDeviceClass.CURTAIN
+        device_class=CoverDeviceClass.CURTAIN, icon=ICON_VERTICAL_BLIND
     ),
 }
 

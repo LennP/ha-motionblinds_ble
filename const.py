@@ -37,6 +37,7 @@ ICON_CONNECT = "mdi:bluetooth"
 ICON_DISCONNECT = "mdi:bluetooth-off"
 ICON_FAVORITE = "mdi:star"
 ICON_CONNECTION_TYPE = "mdi:bluetooth-connect"
+ICON_VERTICAL_BLIND = "mdi:blinds-vertical-closed"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
 
