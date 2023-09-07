@@ -308,12 +308,12 @@ class GenericBlind(CoverEntity):
         end_position_info: MotionPositionInfo,
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
-        # Only update position based on feedback when necessary, otherwise cover UI will jump around
-        if self._use_status_position_update_ui:
+        # Only update position based on feedback when necessary and end positions are set, otherwise cover UI will jump around
+        if self._use_status_position_update_ui and end_position_info.UP:
             _LOGGER.info("Using position feedback once")
             self._attr_current_cover_position = 100 - position_percentage
             self._attr_current_cover_tilt_position = 100 - tilt_percentage
-            self._use_status_position_update_ui = False
+        self._use_status_position_update_ui = False
 
         if self._battery_callback is not None:
             self._battery_callback(battery_percentage)
@@ -374,11 +374,9 @@ class GenericBlind(CoverEntity):
         *args,
         **kwargs,
     ) -> bool:
-        _LOGGER.warning(ignore_end_positions_not_set)
         await self.before_command(*args, **kwargs)
         if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = False
-        _LOGGER.warning(ignore_end_positions_not_set)  # THIS IS FALSE?
         return await func(
             self,
             ignore_end_positions_not_set=ignore_end_positions_not_set,
@@ -443,9 +441,10 @@ class PositionBlind(GenericBlind):
 
         _LOGGER.info("Set position to %s %s", str(new_position), self.device_address)
         self.async_update_running(
-            MotionRunningType.STILL
+            MotionRunningType.UNKNOWN
             if self._attr_current_cover_position is None
-            or new_position == 100 - self._attr_current_cover_position
+            else MotionRunningType.STILL
+            if new_position == 100 - self._attr_current_cover_position
             else MotionRunningType.OPENING
             if new_position < 100 - self._attr_current_cover_position
             else MotionRunningType.CLOSING
@@ -574,7 +573,7 @@ class PositionCalibrationBlind(PositionBlind):
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
         """Update the calibration status of the motor."""
         _LOGGER.info("Calibrated: %s", end_position_info.UP)
-        _LOGGER.warning("Self: %s", self._running_type)
+        _LOGGER.warning("Running type: %s", self._running_type)
         new_calibration_type = (
             MotionCalibrationType.CALIBRATED  # Calibrated if end positions are set
             if end_position_info.UP
@@ -584,7 +583,7 @@ class PositionCalibrationBlind(PositionBlind):
             in [MotionRunningType.OPENING, MotionRunningType.CLOSING]
             else MotionCalibrationType.UNCALIBRATED
         )
-        _LOGGER.warning(new_calibration_type)
+        _LOGGER.warning("New calibration type: %s", new_calibration_type)
 
         if (
             self._calibration_type is MotionCalibrationType.CALIBRATING
