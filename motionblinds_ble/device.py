@@ -45,8 +45,14 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def requires_end_positions(func: Callable) -> Callable:
-    async def wrapper(self: MotionDevice, *args, **kwargs):
-        if self.end_position_info is not None and not self.end_position_info.UP:
+    async def wrapper(
+        self: MotionDevice, ignore_end_positions_not_set: bool = False, *args, **kwargs
+    ):
+        if (
+            self.end_position_info is not None
+            and not self.end_position_info.UP
+            and not ignore_end_positions_not_set
+        ):
             raise NoEndPositionsException(EXCEPTION_NO_END_POSITIONS)
         return await func(self, *args, **kwargs)
 
@@ -434,7 +440,9 @@ class MotionDevice:
 
     @requires_connection
     @requires_end_positions
-    async def percentage(self, percentage: int) -> bool:
+    async def percentage(
+        self, percentage: int, ignore_end_positions_not_set: bool = False
+    ) -> bool:
         """Moves the device to a specific percentage."""
         assert not percentage < 0 and not percentage > 100
         command_prefix = (
@@ -444,14 +452,14 @@ class MotionDevice:
 
     @requires_connection
     @requires_end_positions
-    async def open(self) -> bool:
+    async def open(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Open the device."""
         command_prefix = str(MotionCommandType.OPEN.value)
         return await self._send_command(command_prefix)
 
     @requires_connection
     @requires_end_positions
-    async def close(self) -> bool:
+    async def close(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Close the device."""
         command_prefix = str(MotionCommandType.CLOSE.value)
         return await self._send_command(command_prefix)
@@ -472,7 +480,9 @@ class MotionDevice:
 
     @requires_connection
     @requires_end_positions
-    async def percentage_tilt(self, percentage: int) -> bool:
+    async def percentage_tilt(
+        self, percentage: int, ignore_end_positions_not_set: bool = False
+    ) -> bool:
         """Tilt the device to a specific position."""
         angle = round(180 * percentage / 100)
         command_prefix = (
@@ -482,7 +492,7 @@ class MotionDevice:
 
     @requires_connection
     @requires_end_positions
-    async def open_tilt(self) -> bool:
+    async def open_tilt(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Tilt the device open."""
         # Step or fully tilt?
         # command_prefix = str(MotionCommandType.OPEN_TILT.value)
@@ -491,7 +501,7 @@ class MotionDevice:
 
     @requires_connection
     @requires_end_positions
-    async def close_tilt(self) -> bool:
+    async def close_tilt(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Tilt the device closed."""
         # Step or fully tilt?
         # command_prefix = str(MotionCommandType.CLOSE_TILT.value)

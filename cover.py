@@ -54,27 +54,20 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # Decorator used to perform checks before executing a command
-DECORATOR_METHOD_BEFORE_RUN = "before_run_command"
-DECORATOR_METHOD_AFTER_RUN = "after_run_command"
-DECORATOR_METHOD_BEFORE_NO_RUN = "before_no_run_command"
-DECORATOR_METHOD_AFTER_NO_RUN = "after_no_run_command"
+DECORATOR_METHOD_RUN_COMMAND = "run_command"
+DECORATOR_METHOD_NO_RUN_COMMAND = "no_run_command"
 
 
-def generic_command_decorator(
-    before_method_name: str, after_method_name: str, func: Callable
-) -> Callable:
+def generic_command_decorator(method_name: str, func: Callable) -> Callable:
     async def wrapper(self, *args, **kwargs):
         # Check if the object has an attribute named DECORATOR_FUNCTION
-        if hasattr(self, before_method_name):
-            # Get the attribute and call it
-            before_func = getattr(self, before_method_name)
-            if not await before_func(*args, **kwargs):
-                return  # Don't execute function if before_func returns False
-        res = await func(self, *args, **kwargs)
-        if hasattr(self, after_method_name):
-            # Get the attribute and call it
-            after_func = getattr(self, after_method_name)
-            await after_func(*args, **kwargs)
+        if hasattr(self, method_name):
+            decorator_func: Callable = getattr(self, method_name)
+            # Let the decorator method handle what happens before and after the method
+            res = await decorator_func(func, *args, **kwargs)
+        else:
+            # Call the function directly
+            res = await func(self, *args, **kwargs)
         return res
 
     return wrapper
@@ -82,16 +75,12 @@ def generic_command_decorator(
 
 # Decorator used for commands that move the motor position
 def run_command(func: Callable) -> Callable:
-    return generic_command_decorator(
-        DECORATOR_METHOD_BEFORE_RUN, DECORATOR_METHOD_AFTER_RUN, func
-    )
+    return generic_command_decorator(DECORATOR_METHOD_RUN_COMMAND, func)
 
 
 # Decorator used for commands that do not move the motor position
 def no_run_command(func: Callable) -> Callable:
-    return generic_command_decorator(
-        DECORATOR_METHOD_BEFORE_NO_RUN, DECORATOR_METHOD_AFTER_NO_RUN, func
-    )
+    return generic_command_decorator(DECORATOR_METHOD_NO_RUN_COMMAND, func)
 
 
 @dataclass
@@ -376,18 +365,32 @@ class GenericBlind(CoverEntity):
             self.async_refresh_disconnect_timer()
 
     # Decorator
-    async def before_run_command(self, *args, **kwargs) -> bool:
+    async def run_command(
+        self,
+        func: Callable,
+        ignore_end_positions_not_set: bool = False,
+        *args,
+        **kwargs,
+    ) -> bool:
+        _LOGGER.warning(ignore_end_positions_not_set)
         await self.before_command(*args, **kwargs)
         if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = False
-        return True
+        _LOGGER.warning(ignore_end_positions_not_set)  # THIS IS FALSE?
+        return await func(
+            self,
+            ignore_end_positions_not_set=ignore_end_positions_not_set,
+            *args,
+            **kwargs,
+        )
 
     # Decorator
-    async def before_no_run_command(self, *args, **kwargs) -> bool:
+    async def no_run_command(self, func: Callable, *args, **kwargs) -> bool:
         await self.before_command(*args, **kwargs)
         if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = True
-        return True
+            self.async_update_running(MotionRunningType.STILL)
+        return await func(self, *args, **kwargs)
 
 
 class PositionBlind(GenericBlind):
@@ -406,27 +409,33 @@ class PositionBlind(GenericBlind):
         await super().async_added_to_hass()
 
     @run_command
-    async def async_open_cover(self, **kwargs: any) -> None:
+    async def async_open_cover(
+        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+    ) -> None:
         """Open the blind."""
         _LOGGER.info("Open %s", self.device_address)
         self.async_update_running(MotionRunningType.OPENING)
-        if await self._device.open():
+        if await self._device.open(ignore_end_positions_not_set):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
 
     @run_command
-    async def async_close_cover(self, **kwargs: any) -> None:
+    async def async_close_cover(
+        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+    ) -> None:
         """Close the blind."""
         _LOGGER.info("Close %s", self.device_address)
         self.async_update_running(MotionRunningType.CLOSING)
-        if await self._device.close():
+        if await self._device.close(ignore_end_positions_not_set):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
 
     @run_command
-    async def async_set_cover_position(self, **kwargs: any) -> None:
+    async def async_set_cover_position(
+        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+    ) -> None:
         """Move the blind to a specific position."""
         new_position = 100 - kwargs.get(ATTR_POSITION)
 
@@ -439,7 +448,7 @@ class PositionBlind(GenericBlind):
             if new_position < 100 - self._attr_current_cover_position
             else MotionRunningType.CLOSING
         )
-        if await self._device.percentage(new_position):
+        if await self._device.percentage(new_position, ignore_end_positions_not_set):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -461,21 +470,25 @@ class TiltBlind(GenericBlind):
         await super().async_added_to_hass()
 
     @run_command
-    async def async_open_cover_tilt(self, **kwargs: any) -> None:
+    async def async_open_cover_tilt(
+        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+    ) -> None:
         """Tilt the blind open."""
         _LOGGER.info("Open tilt %s", self.device_address)
         self.async_update_running(MotionRunningType.OPENING)
-        if await self._device.open_tilt():
+        if await self._device.open_tilt(ignore_end_positions_not_set):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
 
     @run_command
-    async def async_close_cover_tilt(self, **kwargs: any) -> None:
+    async def async_close_cover_tilt(
+        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+    ) -> None:
         """Tilt the blind closed."""
         _LOGGER.info("Close tilt %s", self.device_address)
         self.async_update_running(MotionRunningType.CLOSING)
-        if await self._device.close_tilt():
+        if await self._device.close_tilt(ignore_end_positions_not_set):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -486,7 +499,9 @@ class TiltBlind(GenericBlind):
         await self.async_stop_cover(**kwargs)
 
     @run_command
-    async def async_set_cover_tilt_position(self, **kwargs: any) -> None:
+    async def async_set_cover_tilt_position(
+        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+    ) -> None:
         """Tilt the blind to a specific position."""
         new_tilt_position = 100 - kwargs.get(ATTR_TILT_POSITION)
 
@@ -501,7 +516,9 @@ class TiltBlind(GenericBlind):
             if new_tilt_position < 100 - self._attr_current_cover_tilt_position
             else MotionRunningType.CLOSING
         )
-        if await self._device.percentage_tilt(new_tilt_position):
+        if await self._device.percentage_tilt(
+            new_tilt_position, ignore_end_positions_not_set
+        ):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -541,7 +558,7 @@ class PositionCalibrationBlind(PositionBlind):
     def async_update_running(self, running_type: MotionRunningType) -> None:
         if (
             self._calibration_type is MotionCalibrationType.UNCALIBRATED
-            and running_type is not MotionRunningType.STILL
+            and running_type in [MotionRunningType.OPENING, MotionRunningType.CLOSING]
         ):
             # Curtain motor will calibrate if not calibrated and moved to some position
             _LOGGER.info("Starting calibration")
@@ -561,7 +578,8 @@ class PositionCalibrationBlind(PositionBlind):
             if end_position_info.UP
             else MotionCalibrationType.CALIBRATING  # Calibrating if no end positions, and motor is running
             if self._running_type is not None
-            and self._running_type is not MotionRunningType.STILL
+            and self._running_type
+            in [MotionRunningType.OPENING, MotionRunningType.CLOSING]
             else MotionCalibrationType.UNCALIBRATED
         )
         _LOGGER.warning(new_calibration_type)
@@ -591,11 +609,20 @@ class PositionCalibrationBlind(PositionBlind):
         ):
             # Set calibration to None if disconnected
             self._calibration_callback(None)
+            self._running_type = None
         super().async_update_connection(connection_type)
 
     async def async_connect(self) -> bool:
         """Connect to the blind, add a delay before sending the status query."""
         return await super().async_connect(notification_delay=True)
+
+    # Decorator
+    async def run_command(self, func: Callable, *args, **kwargs) -> bool:
+        """Run before every command that moves a blind, return whether or not to proceed with the command."""
+        # Do not throw an exception if the end positions are not set but a move command is given
+        return await super().run_command(
+            func, ignore_end_positions_not_set=True, *args, **kwargs
+        )
 
 
 class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
@@ -609,9 +636,9 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
         await super().async_added_to_hass()
 
     # Decorator
-    async def before_run_command(self, *args, **kwargs):
+    async def run_command(self, func: Callable, *args, **kwargs) -> bool:
         """Run before every command that moves a blind, return whether or not to proceed with the command."""
-        await super().before_run_command(args, **kwargs)
+        # Do not throw an exception if the end positions are not set but a move command is given
         if not self._device.is_connected():
             self._calibration_event.clear()
             if not await self.async_connect():
@@ -623,7 +650,7 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
             raise NotCalibratedException(
                 EXCEPTION_NOT_CALIBRATED.format(device_name=self._attr_name)
             )
-        return True
+        return await super().run_command(func, *args, **kwargs)
 
     @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
