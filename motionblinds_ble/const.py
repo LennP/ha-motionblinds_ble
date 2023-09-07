@@ -8,10 +8,10 @@ SETTING_CALIBRATION_DISCONNECT_TIME = 45  # Seconds
 SETTING_NOTIFICATION_DELAY = 0.5  # Seconds
 
 EXCEPTION_NO_END_POSITIONS = (
-    "The motor's end positions need to be set before usage of this command."
+    "{device_name}'s end positions need to be set before usage of this command."
 )
 EXCEPTION_NO_FAVORITE_POSITION = (
-    "The motor's favorite position needs to be set before usage of this command."
+    "{device_name}'s favorite position needs to be set before usage of this command."
 )
 
 

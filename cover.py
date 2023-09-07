@@ -157,7 +157,9 @@ class GenericBlind(CoverEntity):
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
         ble_device = async_ble_device_from_address(self.hass, self.device_address)
-        self._device = MotionDevice(self.device_address, ble_device)
+        self._device = MotionDevice(
+            self.device_address, ble_device, device_name=self._attr_name
+        )
         async_register_callback(
             self.hass,
             self.async_update_ble_device,

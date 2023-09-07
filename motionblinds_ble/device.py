@@ -53,7 +53,9 @@ def requires_end_positions(func: Callable) -> Callable:
             and not self.end_position_info.UP
             and not ignore_end_positions_not_set
         ):
-            raise NoEndPositionsException(EXCEPTION_NO_END_POSITIONS)
+            raise NoEndPositionsException(
+                EXCEPTION_NO_END_POSITIONS.format(device_name=self.device_name)
+            )
         return await func(self, *args, **kwargs)
 
     return wrapper
@@ -66,7 +68,9 @@ def requires_favorite_position(func: Callable) -> Callable:
             and not self.end_position_info.UP
             and not self.end_position_info.FAVORITE
         ):
-            raise NoFavoritePositionException(EXCEPTION_NO_FAVORITE_POSITION)
+            raise NoFavoritePositionException(
+                EXCEPTION_NO_FAVORITE_POSITION.format(device_name=self.device_name)
+            )
         return await func(self, *args, **kwargs)
 
     return wrapper
@@ -96,6 +100,7 @@ class MotionPositionInfo:
 class MotionDevice:
     end_position_info: MotionPositionInfo = None
     _device_address: str = None
+    device_name: str = None
     _ble_device: BLEDevice = None
     _current_bleak_client: BleakClient = None
     _connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
@@ -117,8 +122,11 @@ class MotionDevice:
     _connection_task: Task = None
     _last_connection_caller_time: int = None
 
-    def __init__(self, device_address: str, ble_device: BLEDevice = None) -> None:
+    def __init__(
+        self, device_address: str, ble_device: BLEDevice = None, device_name: str = None
+    ) -> None:
         self._device_address = device_address
+        self.device_name = device_name if device_name is not None else device_address
         if ble_device:
             self._ble_device = ble_device
         else:
