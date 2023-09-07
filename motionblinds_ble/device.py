@@ -303,13 +303,15 @@ class MotionDevice:
         try:
             if not await self._connection_task:
                 return False
-        except BleakOutOfConnectionSlotsError | BleakNotFoundError as e:
+        except (BleakOutOfConnectionSlotsError, BleakNotFoundError) as e:
             self._set_connection(MotionConnectionType.DISCONNECTED)
+            self._connection_task = None
             raise e
         except CancelledError:
             # Return False if connecting has been cancelled
             _LOGGER.info("Cancelled connecting")
             self._set_connection(MotionConnectionType.DISCONNECTED)
+            self._connection_task = None
             return False
 
         self._connection_task = None
