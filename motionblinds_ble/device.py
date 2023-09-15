@@ -45,9 +45,9 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def requires_end_positions(func: Callable) -> Callable:
-    async def wrapper(
-        self: MotionDevice, ignore_end_positions_not_set: bool = False, *args, **kwargs
-    ):
+    async def wrapper(self: MotionDevice, *args, **kwargs):
+        ignore_end_positions_not_set = kwargs.get("ignore_end_positions_not_set", False)
+
         if (
             self.end_position_info is not None
             and not self.end_position_info.UP
