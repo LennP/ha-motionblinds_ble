@@ -450,7 +450,6 @@ class PositionBlind(GenericBlind):
             if new_position < 100 - self._attr_current_cover_position
             else MotionRunningType.CLOSING
         )
-        _LOGGER.warning(new_position)
         if await self._device.percentage(new_position, ignore_end_positions_not_set):
             self.async_write_ha_state()
         else:

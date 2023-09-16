@@ -3,12 +3,14 @@ from __future__ import annotations
 
 import logging
 from asyncio import (
-    CancelledError,
+    FIRST_COMPLETED,
+    Future,
     Task,
     TimerHandle,
     create_task,
     get_event_loop,
     sleep,
+    wait,
 )
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
@@ -99,19 +101,96 @@ class MotionPositionInfo:
     FAVORITE: bool
 
 
+class ConnectionQueue:
+    """Class used to ensure the first caller connects, but the last caller's command goes through after connection"""
+
+    _ha_create_task: Callable[[Coroutine], Task] = None
+    _connection_task: Task = None
+    _last_caller_cancel: Future = None
+
+    def set_ha_create_task(self, ha_create_task: Callable[[Coroutine], Task]) -> None:
+        """Set the Home Assistant create_task function."""
+        self._ha_create_task = ha_create_task
+
+    def _create_connection_task(
+        self, device: MotionDevice, use_notification_delay: bool = False
+    ) -> None:
+        """Create a connection task."""
+        if self._ha_create_task:
+            _LOGGER.warning("HA connecting")
+            self._connection_task = self._ha_create_task(
+                target=device.establish_connection(
+                    use_notification_delay=use_notification_delay
+                )
+            )
+        else:
+            _LOGGER.warning("Normal connecting")
+            self._connection_task = get_event_loop().create_task(
+                device.establish_connection(
+                    use_notification_delay=use_notification_delay
+                )
+            )
+
+    async def wait_for_connection(
+        self, device: MotionDevice, use_notification_delay: bool = False
+    ) -> bool:
+        """Wait for a connection, only return True to the last caller and if connected."""
+        if self._connection_task is None:
+            _LOGGER.info("First caller connecting")
+            self._create_connection_task(
+                device, use_notification_delay=use_notification_delay
+            )
+        else:
+            _LOGGER.info("Already connecting, waiting for connection")
+
+        # Cancel the previous caller
+        if self._last_caller_cancel:
+            self._last_caller_cancel.set_result(True)
+        self._last_caller_cancel = Future()
+
+        try:
+            done, pending = await wait(
+                [self._connection_task, self._last_caller_cancel],
+                return_when=FIRST_COMPLETED,
+            )
+            if self._connection_task in done:
+                result = (
+                    self._connection_task.result()
+                )  # Get the result of the completed connection task
+                self._connection_task = None  # Reset the connection task
+                _LOGGER.info("Last caller continuing")
+                return result
+            else:
+                _LOGGER.info("Cancelled previous caller")
+                return False
+
+        except (BleakOutOfConnectionSlotsError, BleakNotFoundError) as e:
+            device.set_connection(MotionConnectionType.DISCONNECTED)
+            self._connection_task = None
+            raise e
+
+    def cancel(self) -> bool:
+        """Cancel the connection task."""
+        if self._connection_task is not None:
+            self._connection_task.cancel()  # Indicate the connection has failed.
+            self._connection_task = None
+            return True
+        return False
+
+
 class MotionDevice:
     end_position_info: MotionPositionInfo = None
-    _device_address: str = None
+    device_address: str = None
     device_name: str = None
     _ble_device: BLEDevice = None
     _current_bleak_client: BleakClient = None
     _connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
+    _connection_queue: ConnectionQueue = None
 
     _disconnect_time: int = None
     _disconnect_timer: TimerHandle | Callable = None
 
     # Callbacks that are used to interface with HA
-    _ha_create_task: Callable[[Coroutine], Task] = None
     _ha_call_later: Callable[[int, Coroutine], Callable] = None
 
     # Regular callbacks
@@ -120,15 +199,12 @@ class MotionDevice:
     _connection_callback: Callable[[MotionConnectionType], None] = None
     _status_callback: Callable[[int, int, int, MotionSpeedLevel], None] = None
 
-    # Used to ensure the first caller connects, but the last caller's command goes through when connecting
-    _connection_task: Task = None
-    _last_connection_caller_time: int = None
-
     def __init__(
         self, device_address: str, ble_device: BLEDevice = None, device_name: str = None
     ) -> None:
-        self._device_address = device_address
+        self.device_address = device_address
         self.device_name = device_name if device_name is not None else device_address
+        self._connection_queue = ConnectionQueue()
         if ble_device:
             self._ble_device = ble_device
         else:
@@ -136,7 +212,7 @@ class MotionDevice:
                 "Could not find BLEDevice, creating new BLEDevice from address"
             )
             self._ble_device = BLEDevice(
-                self._device_address, self._device_address, {}, rssi=0
+                self.device_address, self.device_address, {}, rssi=0
             )
 
     def set_ble_device(self, ble_device: BLEDevice) -> None:
@@ -145,7 +221,7 @@ class MotionDevice:
 
     def set_ha_create_task(self, ha_create_task: Callable[[Coroutine], Task]) -> None:
         """Set the create_task function to use."""
-        self._ha_create_task = ha_create_task
+        self._connection_queue.set_ha_create_task(ha_create_task)
 
     def set_ha_call_later(
         self, ha_call_later: Callable[[int, Coroutine], Callable]
@@ -153,13 +229,13 @@ class MotionDevice:
         """Set the call_later function to use."""
         self._ha_call_later = ha_call_later
 
-    def _set_connection(self, connection_type: MotionConnectionType) -> None:
+    def set_connection(self, connection_type: MotionConnectionType) -> None:
         """Set the connection to a particular connection type."""
         if self._connection_callback:
             self._connection_callback(connection_type)
         self._connection_type = connection_type
 
-    def _cancel_disconnect_timer(self) -> None:
+    def cancel_disconnect_timer(self) -> None:
         if self._disconnect_timer:
             # Cancel current timer
             if callable(self._disconnect_timer):
@@ -183,7 +259,7 @@ class MotionDevice:
         ):
             return
 
-        self._cancel_disconnect_timer()
+        self.cancel_disconnect_timer()
 
         _LOGGER.info(f"Refreshing disconnect timer to {timeout}s")
 
@@ -267,94 +343,52 @@ class MotionDevice:
 
     def _disconnect_callback(self, client: BleakClient) -> None:
         """Callback called by Bleak when a client disconnects."""
-        _LOGGER.info("Device %s disconnected!", self._device_address)
-        self._set_connection(MotionConnectionType.DISCONNECTED)
+        _LOGGER.info("Device %s disconnected!", self.device_address)
+        self.set_connection(MotionConnectionType.DISCONNECTED)
         self._current_bleak_client = None
 
     async def connect(self, use_notification_delay: bool = False) -> bool:
         """Connect to the device if not connected, return whether or not the motor is ready for a command."""
         if not self.is_connected():
             # Connect if not connected yet and not busy connecting
-            return await self._connect_if_not_connecting(use_notification_delay)
+            return await self._connection_queue.wait_for_connection(
+                self, use_notification_delay=use_notification_delay
+            )
         else:
             self.refresh_disconnect_timer()
         return True
 
     async def disconnect(self) -> None:
         """Called by Home Assistant after X time."""
-        self._set_connection(MotionConnectionType.DISCONNECTING)
-        if self._connection_task is not None:
-            _LOGGER.info("Cancelling connecting %s", self._device_address)
-            self._connection_task.cancel()  # Indicate the connection has failed.
-            self._cancel_disconnect_timer()
-            self._connection_task = None
+        self.set_connection(MotionConnectionType.DISCONNECTING)
+        self.cancel_disconnect_timer()
+        if self._connection_queue.cancel():
+            _LOGGER.info("Cancelled connecting to %s", self.device_address)
         if self._current_bleak_client is not None:
-            _LOGGER.info("Disconnecting %s", self._device_address)
-            self._cancel_disconnect_timer()
+            _LOGGER.info("Disconnecting %s", self.device_address)
             await self._current_bleak_client.disconnect()
             self._current_bleak_client = None
-        self._set_connection(MotionConnectionType.DISCONNECTED)
+        self.set_connection(MotionConnectionType.DISCONNECTED)
 
-    async def _connect_if_not_connecting(
-        self, use_notification_delay: bool = False
-    ) -> bool:
-        """Connect if no connection is currently attempted, return True if the motor is ready for a command and only to the last caller."""
-        # Don't try to connect if we are already connecting
-        this_connection_caller_time = time_ns()
-        self._last_connection_caller_time = this_connection_caller_time
-        if self._connection_task is None:
-            _LOGGER.info("First caller connecting")
-            if self._ha_create_task:
-                _LOGGER.warning("HA connecting")
-                self._connection_task = self._ha_create_task(
-                    target=self._connect(use_notification_delay)
-                )
-            else:
-                _LOGGER.warning("Normal connecting")
-                self._connection_task = get_event_loop().create_task(
-                    self._connect(use_notification_delay)
-                )
-        else:
-            _LOGGER.info("Already connecting, waiting for connection")
-        try:
-            if not await self._connection_task:
-                return False
-        except (BleakOutOfConnectionSlotsError, BleakNotFoundError) as e:
-            self._set_connection(MotionConnectionType.DISCONNECTED)
-            self._connection_task = None
-            raise e
-        except CancelledError:
-            # Return False if connecting has been cancelled
-            _LOGGER.info("Cancelled connecting")
-            self._set_connection(MotionConnectionType.DISCONNECTED)
-            self._connection_task = None
-            return False
-
-        self._connection_task = None
-        is_last_caller = (
-            self._last_connection_caller_time == this_connection_caller_time
-        )
-        return is_last_caller  # Return whether or not this function was the last caller
-
-    async def _connect(self, use_notification_delay: bool = False) -> bool:
+    async def establish_connection(self, use_notification_delay: bool = False) -> bool:
         """Connect to the device, return whether or not the motor is ready for a command."""
         if self._connection_type is MotionConnectionType.CONNECTING:
             return False
 
-        self._set_connection(MotionConnectionType.CONNECTING)
-        _LOGGER.info("Connecting to %s", self._device_address)
+        self.set_connection(MotionConnectionType.CONNECTING)
+        _LOGGER.info("Connecting to %s", self.device_address)
 
         _LOGGER.info("Establishing connection")
         bleak_client = await establish_connection(
             BleakClient,
             self._ble_device,
-            self._device_address,
+            self.device_address,
             max_attempts=SETTING_MAX_CONNECT_ATTEMPTS,
         )
 
-        _LOGGER.info("Connected to %s", self._device_address)
+        _LOGGER.info("Connected to %s", self.device_address)
         self._current_bleak_client = bleak_client
-        self._set_connection(MotionConnectionType.CONNECTED)
+        self.set_connection(MotionConnectionType.CONNECTED)
 
         await bleak_client.start_notify(
             str(MotionCharacteristic.NOTIFICATION.value),
