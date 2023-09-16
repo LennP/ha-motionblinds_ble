@@ -56,6 +56,8 @@ def requires_end_positions(func: Callable) -> Callable:
             and not ignore_end_positions_not_set
         ):
             self.refresh_disconnect_timer()
+            if callable(self.running_callback):
+                self.running_callback(MotionRunningType.STILL)
             raise NoEndPositionsException(
                 EXCEPTION_NO_END_POSITIONS.format(device_name=self.device_name)
             )
@@ -72,6 +74,8 @@ def requires_favorite_position(func: Callable) -> Callable:
             and not self.end_position_info.FAVORITE
         ):
             self.refresh_disconnect_timer()
+            if callable(self.running_callback):
+                self.running_callback(MotionRunningType.STILL)
             raise NoFavoritePositionException(
                 EXCEPTION_NO_FAVORITE_POSITION.format(device_name=self.device_name)
             )
@@ -195,7 +199,7 @@ class MotionDevice:
 
     # Regular callbacks
     _position_callback: Callable[[int, int], None] = None
-    _running_callback: Callable[[bool], None] = None
+    running_callback: Callable[[bool], None] = None
     _connection_callback: Callable[[MotionConnectionType], None] = None
     _status_callback: Callable[[int, int, int, MotionSpeedLevel], None] = None
 
@@ -306,7 +310,7 @@ class MotionDevice:
             )
         elif (
             decrypted_message.startswith(MotionNotificationType.RUNNING.value)
-            and self._running_callback is not None
+            and self.running_callback is not None
         ):
             _LOGGER.info("Running notification")
             running_type: bool = decrypted_message_bytes[5] == MotionRunningType.OPENING
@@ -560,7 +564,7 @@ class MotionDevice:
 
     def register_running_callback(self, callback: Callable[[bool], None]) -> None:
         """Register the callback used to update the running type."""
-        self._running_callback = callback
+        self.running_callback = callback
 
     def register_connection_callback(
         self, callback: Callable[[MotionConnectionType], None]
