@@ -310,7 +310,7 @@ class GenericBlind(CoverEntity):
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
         # Only update position based on feedback when necessary and end positions are set, otherwise cover UI will jump around
-        if self._use_status_position_update_ui and end_position_info.UP:
+        if self._use_status_position_update_ui and end_position_info.up:
             _LOGGER.info("Using position feedback once")
             self._attr_current_cover_position = 100 - position_percentage
             self._attr_current_cover_tilt_position = 100 - tilt_percentage
@@ -573,11 +573,11 @@ class PositionCalibrationBlind(PositionBlind):
     @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
         """Update the calibration status of the motor."""
-        _LOGGER.info("Calibrated: %s", end_position_info.UP)
+        _LOGGER.info("Calibrated: %s", end_position_info.up)
         _LOGGER.warning("Running type: %s", self._running_type)
         new_calibration_type = (
             MotionCalibrationType.CALIBRATED  # Calibrated if end positions are set
-            if end_position_info.UP
+            if end_position_info.up
             else MotionCalibrationType.CALIBRATING  # Calibrating if no end positions, and motor is running
             if self._running_type is not None
             and self._running_type

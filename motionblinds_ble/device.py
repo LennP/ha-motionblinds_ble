@@ -52,7 +52,7 @@ def requires_end_positions(func: Callable) -> Callable:
 
         if (
             self.end_position_info is not None
-            and not self.end_position_info.UP
+            and not self.end_position_info.up
             and not ignore_end_positions_not_set
         ):
             self.refresh_disconnect_timer()
@@ -70,8 +70,8 @@ def requires_favorite_position(func: Callable) -> Callable:
     async def wrapper(self: MotionDevice, *args, **kwargs):
         if (
             self.end_position_info is not None
-            and not self.end_position_info.UP
-            and not self.end_position_info.FAVORITE
+            and not self.end_position_info.up
+            and not self.end_position_info.favorite
         ):
             self.refresh_disconnect_timer()
             if callable(self.running_callback):
@@ -95,18 +95,22 @@ def requires_connection(func: Callable) -> Callable:
 
 @dataclass
 class MotionPositionInfo:
-    def __init__(self, end_positions_byte: int, favorite_bytes: int) -> None:
-        self.UP = bool(end_positions_byte & 0x08)
-        self.DOWN = bool(end_positions_byte & 0x04)
-        self.FAVORITE = (favorite_bytes & 0xFF00) != 0x00 or (favorite_bytes & 0x00FF)
+    up: bool
+    down: bool
+    favorite: bool
 
-    UP: bool
-    DOWN: bool
-    FAVORITE: bool
+    def __init__(self, end_positions_byte: int, favorite_bytes: int) -> None:
+        self.up = bool(end_positions_byte & 0x08)
+        self.down = bool(end_positions_byte & 0x04)
+        self.favorite = bool(favorite_bytes & 0x8000)
+
+    def update_end_positions(self, end_positions_byte: int):
+        self.up = bool(end_positions_byte & 0x08)
+        self.down = bool(end_positions_byte & 0x04)
 
 
 class ConnectionQueue:
-    """Class used to ensure the first caller connects, but the last caller's command goes through after connection"""
+    """Class used to ensure the first caller connects, but the last caller's command goes through after connection."""
 
     _ha_create_task: Callable[[Coroutine], Task] = None
     _connection_task: Task = None
@@ -183,9 +187,11 @@ class ConnectionQueue:
 
 
 class MotionDevice:
-    end_position_info: MotionPositionInfo = None
-    device_address: str = None
+    """Class used to control a MotionBlinds device."""
+
     device_name: str = None
+    device_address: str = None
+    end_position_info: MotionPositionInfo = None
     _ble_device: BLEDevice = None
     _current_bleak_client: BleakClient = None
     _connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
@@ -296,12 +302,7 @@ class MotionDevice:
             and self._position_callback is not None
         ):
             _LOGGER.info("Position notification")
-            self.end_position_info: MotionPositionInfo = MotionPositionInfo(
-                decrypted_message_bytes[4],
-                int.from_bytes(
-                    [decrypted_message_bytes[6], decrypted_message_bytes[7]]
-                ),
-            )
+            self.end_position_info.update_end_positions(decrypted_message_bytes[4])
             position_percentage: int = decrypted_message_bytes[6]
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
