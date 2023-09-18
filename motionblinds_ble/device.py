@@ -310,14 +310,6 @@ class MotionDevice:
                 position_percentage, angle_percentage, self.end_position_info
             )
         elif (
-            decrypted_message.startswith(MotionNotificationType.RUNNING.value)
-            and self.running_callback is not None
-        ):
-            _LOGGER.info("Running notification")
-            running_type: bool = decrypted_message_bytes[5] == MotionRunningType.OPENING
-            # Test to see if works
-            # self._running_callback(running_type)
-        elif (
             decrypted_message.startswith(MotionNotificationType.STATUS.value)
             and self._status_callback is not None
         ):

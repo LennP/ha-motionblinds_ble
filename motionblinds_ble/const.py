@@ -42,7 +42,6 @@ class MotionCommandType(StrEnum):
 
 class MotionNotificationType(StrEnum):
     PERCENT = "07040402"
-    RUNNING = "070404021e"
     STATUS = "12040f02"
 
 
