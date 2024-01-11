@@ -7,9 +7,10 @@ from typing import Any
 
 import voluptuous as vol
 
+from bleak.backends.device import BLEDevice
+
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-from homeassistant.components.bluetooth.wrappers import BLEDevice
 from homeassistant.config_entries import ConfigFlow, FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (
