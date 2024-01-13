@@ -3,7 +3,6 @@
 import logging
 from math import ceil
 
-from homeassistant.components.bluetooth.wrappers import BLEDevice
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
