@@ -204,10 +204,12 @@ class MotionDevice:
     _ha_call_later: Callable[[int, Coroutine], Callable] = None
 
     # Regular callbacks
-    _position_callback: Callable[[int, int], None] = None
-    running_callback: Callable[[bool], None] = None
+    _position_callback: Callable[[int, int, MotionPositionInfo], None] = None
+    running_callback: Callable[[MotionRunningType], None] = None
     _connection_callback: Callable[[MotionConnectionType], None] = None
-    _status_callback: Callable[[int, int, int, MotionSpeedLevel], None] = None
+    _status_callback: Callable[
+        [int, int, int, MotionSpeedLevel, MotionPositionInfo], None
+    ] = None
 
     def __init__(
         self, device_address: str, ble_device: BLEDevice = None, device_name: str = None
@@ -551,11 +553,15 @@ class MotionDevice:
         )
         return await self._send_command(command_prefix)
 
-    def register_position_callback(self, callback: Callable[[int, int], None]) -> None:
+    def register_position_callback(
+        self, callback: Callable[[int, int, MotionPositionInfo], None]
+    ) -> None:
         """Register the callback used to update the position."""
         self._position_callback = callback
 
-    def register_running_callback(self, callback: Callable[[bool], None]) -> None:
+    def register_running_callback(
+        self, callback: Callable[[MotionRunningType], None]
+    ) -> None:
         """Register the callback used to update the running type."""
         self.running_callback = callback
 
@@ -566,7 +572,8 @@ class MotionDevice:
         self._connection_callback = callback
 
     def register_status_callback(
-        self, callback: Callable[[int, int, int, MotionSpeedLevel], None]
+        self,
+        callback: Callable[[int, int, int, MotionSpeedLevel, MotionPositionInfo], None],
     ) -> None:
         """Register the callback used to update the motor status, e.g. position, tilt and battery percentage."""
         self._status_callback = callback
