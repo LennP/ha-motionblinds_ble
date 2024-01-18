@@ -158,6 +158,7 @@ class GenericBlind(CoverEntity):
         self._attr_is_closed: bool | None = None
         self._attr_is_opening: bool | None = None
         self._attr_is_closing: bool | None = None
+        self._attr_should_poll: bool = False
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -188,6 +189,11 @@ class GenericBlind(CoverEntity):
         self._device.register_status_callback(self.async_update_status)
         await super().async_added_to_hass()
 
+    async def async_update(self) -> None:
+        """Update state, called by HA if there is a poll interval and by the service homeassistant.update_entity."""
+        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Updating entity")
+        await self._device.connect()
+
     def async_refresh_disconnect_timer(
         self, timeout: int = None, force: bool = False
     ) -> None:
@@ -196,13 +202,11 @@ class GenericBlind(CoverEntity):
 
     async def async_connect(self, notification_delay: bool = False) -> bool:
         """Connect to the blind."""
-        # _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Connecting")
         self._use_status_position_update_ui = True
         return await self._device.connect(notification_delay)
 
     async def async_disconnect(self, **kwargs: any) -> None:
         """Disconnect the blind."""
-        # _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Disconnecting")
         self._use_status_position_update_ui = False
         await self._device.disconnect()
 
@@ -276,7 +280,9 @@ class GenericBlind(CoverEntity):
     @callback
     def async_update_connection(self, connection_type: MotionConnectionType) -> None:
         """Callback used to update the connection status."""
-        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) {connection_type.title()}")
+        _LOGGER.info(
+            f"({self.config_entry.data[CONF_MAC_CODE]}) {connection_type.title()}"
+        )
         self._attr_connection_type = connection_type
         if self._connection_callback is not None:
             self._connection_callback(connection_type)
