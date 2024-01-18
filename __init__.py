@@ -26,7 +26,12 @@ from .const import (
 from .cover import GenericBlind
 from .motionblinds_ble.crypt import MotionCrypt
 
-PLATFORMS: list[Platform] = [Platform.COVER, Platform.SENSOR, Platform.SELECT]
+PLATFORMS: list[Platform] = [
+    Platform.COVER,
+    Platform.SENSOR,
+    Platform.SELECT,
+    Platform.BUTTON,
+]
 
 _LOGGER = logging.getLogger(__name__)
 
