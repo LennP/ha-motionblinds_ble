@@ -3,7 +3,6 @@
 from enum import StrEnum
 
 ATTR_CALIBRATION = "calibration"
-ATTR_CONNECTION_TIMEOUT = "connection_timeout"
 ATTR_CONNECTION_TYPE = "connection_type"
 ATTR_SPEED = "speed"
 ATTR_BATTERY = "battery"
@@ -40,11 +39,6 @@ ICON_CONNECTION_TYPE = "mdi:bluetooth-connect"
 ICON_VERTICAL_BLIND = "mdi:blinds-vertical-closed"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
-
-SERVICE_CONNECT = "connect"
-SERVICE_DISCONNECT = "disconnect"
-SERVICE_FAVORITE = "favorite"
-SERVICE_STATUS = "status"
 
 SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
 SETTING_MAX_MOTOR_FEEDBACK_TIME = 2  # Seconds
