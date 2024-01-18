@@ -153,7 +153,9 @@ class GenericBlind(CoverEntity):
             manufacturer=MANUFACTURER,
             name=self._attr_name,
         )
-        self._attr_is_closed: bool = None
+        self._attr_is_closed: bool | None = None
+        self._attr_is_opening: bool | None = None
+        self._attr_is_closing: bool | None = None
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
