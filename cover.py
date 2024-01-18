@@ -314,6 +314,8 @@ class GenericBlind(CoverEntity):
             _LOGGER.info("Using position feedback once")
             self._attr_current_cover_position = 100 - position_percentage
             self._attr_current_cover_tilt_position = 100 - tilt_percentage
+            self._attr_is_closed = self._attr_current_cover_position == 0
+
         self._use_status_position_update_ui = False
 
         if self._battery_callback is not None:
