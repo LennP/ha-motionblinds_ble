@@ -40,7 +40,6 @@ ICON_VERTICAL_BLIND = "mdi:blinds-vertical-closed"
 
 MANUFACTURER = "MotionBlinds - Coulisse"
 
-SETTING_DOUBLE_CLICK_TIME = 500  # Milliseconds
 SETTING_MAX_MOTOR_FEEDBACK_TIME = 2  # Seconds
 
 

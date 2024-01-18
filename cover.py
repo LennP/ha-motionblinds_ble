@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import logging
-import time
 from asyncio import Event
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
@@ -40,7 +39,6 @@ from .const import (
     EXCEPTION_NOT_CALIBRATED,
     ICON_VERTICAL_BLIND,
     MANUFACTURER,
-    SETTING_DOUBLE_CLICK_TIME,
     MotionBlindType,
     MotionCalibrationType,
     MotionRunningType,
@@ -134,7 +132,6 @@ class GenericBlind(CoverEntity):
     _attr_connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
     _running_type: MotionRunningType = None
 
-    _last_stop_click_time: int = None
     _use_status_position_update_ui: bool = False
 
     _battery_callback: Callable[[int], None] = None
@@ -219,24 +216,8 @@ class GenericBlind(CoverEntity):
     @run_command
     async def async_stop_cover(self, **kwargs: any) -> None:
         """Stop moving the blind."""
-        current_stop_click_time = time.time_ns() // 1e6
-
-        if (
-            self._last_stop_click_time
-            and current_stop_click_time - self._last_stop_click_time
-            < SETTING_DOUBLE_CLICK_TIME
-        ):
-            # Favorite
-            _LOGGER.info(
-                f"({self.config_entry.data[CONF_MAC_CODE]}) Going to favorite position"
-            )
-            await self._device.favorite()
-            self._last_stop_click_time = None
-        else:
-            # Stop
-            _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Stopping")
-            await self._device.stop()
-            self._last_stop_click_time = current_stop_click_time
+        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Stopping")
+        await self._device.stop()
 
     @run_command
     async def async_favorite(self, **kwargs: any) -> None:
