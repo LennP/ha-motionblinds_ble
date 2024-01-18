@@ -66,7 +66,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> FlowResult:
         _LOGGER.debug(
-            "Discovered Motion bluetooth device: %s", discovery_info.as_dict()
+            "Discovered MotionBlinds bluetooth device: %s", discovery_info.as_dict()
         )
         await self.async_set_unique_id(discovery_info.address)
         self._abort_if_unique_id_configured()

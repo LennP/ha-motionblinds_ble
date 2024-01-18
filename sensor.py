@@ -21,6 +21,7 @@ from .const import (
     ATTR_CONNECTION_TYPE,
     ATTR_SIGNAL_STRENGTH,
     CONF_BLIND_TYPE,
+    CONF_MAC_CODE,
     DOMAIN,
     ICON_CALIBRATION,
     ICON_CONNECTION_TYPE,
@@ -76,7 +77,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up battery sensors based on a config entry."""
-    _LOGGER.info("Setting up sensors")
+
     blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
     entities: list[SensorEntity] = [
@@ -96,6 +97,9 @@ class BatterySensor(SensorEntity):
     """Representation of a battery sensor."""
 
     def __init__(self, blind: GenericBlind) -> None:
+        _LOGGER.info(
+            f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up battery sensor entity"
+        )
         """Initialize the battery sensor."""
         self.entity_description = SENSOR_TYPES[ATTR_BATTERY]
         self._blind = blind
@@ -148,6 +152,9 @@ class ConnectionSensor(SensorEntity):
 
     def __init__(self, blind: GenericBlind) -> None:
         """Initialize the connection sensor."""
+        _LOGGER.info(
+            f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up connection sensor entity"
+        )
         self.entity_description = SENSOR_TYPES[ATTR_CONNECTION_TYPE]
         self._blind = blind
         self._attr_unique_id = f"{blind.unique_id}_{ATTR_CONNECTION_TYPE}"
@@ -171,6 +178,9 @@ class CalibrationSensor(SensorEntity):
 
     def __init__(self, blind: PositionCalibrationBlind) -> None:
         """Initialize the calibration sensor."""
+        _LOGGER.info(
+            f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up calibration sensor entity"
+        )
         self.entity_description = SENSOR_TYPES[ATTR_CALIBRATION]
         self._blind = blind
         self._attr_unique_id = f"{blind.unique_id}_{ATTR_CALIBRATION}"
@@ -194,6 +204,9 @@ class SignalStrengthSensor(SensorEntity):
 
     def __init__(self, blind: GenericBlind) -> None:
         """Initialize the calibration sensor."""
+        _LOGGER.info(
+            f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up signal strength sensor entity"
+        )
         self.entity_description = SENSOR_TYPES[ATTR_SIGNAL_STRENGTH]
         self._blind = blind
         self._attr_unique_id = f"{blind.unique_id}_{ATTR_SIGNAL_STRENGTH}"

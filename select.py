@@ -15,6 +15,7 @@ from homeassistant.helpers.event import async_call_later
 from .const import (
     ATTR_SPEED,
     CONF_BLIND_TYPE,
+    CONF_MAC_CODE,
     DOMAIN,
     ICON_SPEED,
     SETTING_MAX_MOTOR_FEEDBACK_TIME,
@@ -44,7 +45,7 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up speed select entities based on a config entry."""
-    _LOGGER.info("Setting up SpeedSelect")
+
     blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
     if blind.config_entry.data[CONF_BLIND_TYPE] not in [
@@ -62,6 +63,9 @@ class SpeedSelect(SelectEntity):
 
     def __init__(self, blind: GenericBlind) -> None:
         """Initialize the speed select entity."""
+        _LOGGER.info(
+            f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up speed select entity"
+        )
         self.entity_description = SELECT_TYPES[ATTR_SPEED]
         self._blind = blind
         self._attr_unique_id: str = f"{blind.unique_id}_speed"
@@ -95,7 +99,6 @@ class SpeedSelect(SelectEntity):
 
     async def async_select_option(self, option: str) -> None:
         """Change the selected speed_level."""
-        _LOGGER.info("Selected speed option %s", option)
         speed_level = MotionSpeedLevel(int(option))
         self.async_disable_has_selected_speed_callback()
         self._has_selected_speed = True

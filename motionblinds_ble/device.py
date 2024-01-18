@@ -221,7 +221,7 @@ class MotionDevice:
             self._ble_device = ble_device
         else:
             _LOGGER.warning(
-                "Could not find BLEDevice, creating new BLEDevice from address"
+                f"({device_address}) Could not find BLEDevice, creating new BLEDevice from address"
             )
             self._ble_device = BLEDevice(
                 self.device_address, self.device_address, {}, rssi=0
@@ -251,10 +251,8 @@ class MotionDevice:
         if self._disconnect_timer:
             # Cancel current timer
             if callable(self._disconnect_timer):
-                _LOGGER.warning("Cancel HA Later")
                 self._disconnect_timer()
             else:
-                _LOGGER.warning("Cancel later")
                 self._disconnect_timer.cancel()
 
     def refresh_disconnect_timer(

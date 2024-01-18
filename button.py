@@ -15,6 +15,7 @@ from .const import (
     ATTR_CONNECT,
     ATTR_DISCONNECT,
     ATTR_FAVORITE,
+    CONF_MAC_CODE,
     DOMAIN,
     ICON_CONNECT,
     ICON_DISCONNECT,
@@ -76,9 +77,9 @@ async def async_setup_entry(
     hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
 ) -> None:
     """Set up buttons based on a config entry."""
+
     blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
-    _LOGGER.info("Setting up buttons")
     async_add_entities(
         [
             GenericCommandButton(blind, entity_description)
@@ -94,7 +95,9 @@ class GenericCommandButton(ButtonEntity):
         self, blind: GenericBlind, entity_description: CommandButtonEntityDescription
     ) -> None:
         """Initialize the command button."""
-        _LOGGER.info(f"Setting up {entity_description.key} button")
+        _LOGGER.info(
+            f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up {entity_description.key} button entity"
+        )
         self.entity_description = entity_description
         self._blind = blind
         self._attr_unique_id = f"{blind.unique_id}_{entity_description.key}"

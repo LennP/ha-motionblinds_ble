@@ -2,14 +2,11 @@
 from __future__ import annotations
 
 import datetime
-import logging
 
 from Crypto.Cipher import AES
 from Crypto.Cipher._mode_ecb import EcbMode
 from Crypto.Util.Padding import pad, unpad
 from pytz import timezone
-
-_LOGGER = logging.getLogger(__name__)
 
 
 class MotionCrypt:
@@ -53,7 +50,6 @@ class MotionCrypt:
                 "Motion encryption requires a valid timezone."
             )
         now = datetime.datetime.now(MotionCrypt.tz)
-        _LOGGER.info("Current time: " + str(now))
 
         year = now.year % 100
         month = now.month
