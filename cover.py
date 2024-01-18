@@ -280,8 +280,8 @@ class GenericBlind(CoverEntity):
         end_position_info: MotionPositionInfo,
     ) -> None:
         """Callback used to update the position of the blind."""
-        _LOGGER.info(
-            f"({self.config_entry.data[CONF_MAC_CODE]}) Received new position: {new_position_percentage}, tilt: {new_angle_percentage}"
+        _LOGGER.debug(
+            f"({self.config_entry.data[CONF_MAC_CODE]}) Received position update: {new_position_percentage}, tilt: {new_angle_percentage}"
         )
         if isinstance(self, PositionCalibrationBlind):
             self.async_update_calibration(end_position_info)
@@ -322,7 +322,7 @@ class GenericBlind(CoverEntity):
         end_position_info: MotionPositionInfo,
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
-        _LOGGER.info(
+        _LOGGER.debug(
             f"({self.config_entry.data[CONF_MAC_CODE]}) Received status update; position: {position_percentage}, tilt: {tilt_percentage}; battery: {battery_percentage}; speed: {speed_level.name}; top position set: {end_position_info.up}; bottom position set: {end_position_info.down}; favorite position set: {end_position_info.favorite}"
         )
         # Only update position based on feedback when necessary and end positions are set, otherwise cover UI will jump around

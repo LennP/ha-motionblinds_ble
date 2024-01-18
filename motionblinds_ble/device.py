@@ -273,20 +273,22 @@ class MotionDevice:
 
         self.cancel_disconnect_timer()
 
-        _LOGGER.debug(
-            f"({self.device_address}) Refreshing disconnect timer to {timeout}s"
-        )
-
         async def _disconnect_later(t: datetime = None):
             _LOGGER.debug(f"({self.device_address}) Disconnecting after {timeout}s")
             await self.disconnect()
 
         self._disconnect_time = new_disconnect_time
         if self._ha_call_later:
+            _LOGGER.debug(
+                f"({self.device_address}) Refreshing disconnect timer to {timeout}s using Home Assistant"
+            )
             self._disconnect_timer = self._ha_call_later(
                 delay=timeout, action=_disconnect_later
             )
         else:
+            _LOGGER.debug(
+                f"({self.device_address}) Refreshing disconnect timer to {timeout}s"
+            )
             self._disconnect_timer = get_event_loop().call_later(
                 timeout, create_task, _disconnect_later()
             )
@@ -362,7 +364,9 @@ class MotionDevice:
         if self._connection_queue.cancel():
             _LOGGER.debug(f"({self.device_address}) Cancelled connecting")
         if self._current_bleak_client is not None:
+            _LOGGER.debug(f"({self.device_address}) Disconnecting")
             await self._current_bleak_client.disconnect()
+            _LOGGER.debug(f"({self.device_address}) Disconnected")
             self._current_bleak_client = None
         self.set_connection(MotionConnectionType.DISCONNECTED)
 
