@@ -199,11 +199,13 @@ class GenericBlind(CoverEntity):
 
     async def async_connect(self, notification_delay: bool = False) -> bool:
         """Connect to the blind."""
+        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Connecting")
         self._use_status_position_update_ui = True
         return await self._device.connect(notification_delay)
 
     async def async_disconnect(self, **kwargs: any) -> None:
         """Disconnect the blind."""
+        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Disconnecting")
         self._use_status_position_update_ui = False
         await self._device.disconnect()
 
@@ -320,6 +322,9 @@ class GenericBlind(CoverEntity):
         end_position_info: MotionPositionInfo,
     ) -> None:
         """Callback used to update motor status, e.g. position, tilt and battery percentage."""
+        _LOGGER.info(
+            f"({self.config_entry.data[CONF_MAC_CODE]}) Received status update; position: {position_percentage}, tilt: {tilt_percentage}; battery: {battery_percentage}; speed: {speed_level.name}; top position set: {end_position_info.up}; bottom position set: {end_position_info.down}; favorite position set: {end_position_info.favorite}"
+        )
         # Only update position based on feedback when necessary and end positions are set, otherwise cover UI will jump around
         if self._use_status_position_update_ui and end_position_info.up:
             self._attr_current_cover_position = 100 - position_percentage

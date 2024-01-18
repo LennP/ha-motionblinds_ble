@@ -125,14 +125,14 @@ class ConnectionQueue:
     ) -> None:
         """Create a connection task."""
         if self._ha_create_task:
-            _LOGGER.warning("HA connecting")
+            _LOGGER.debug(f"({device.device_address}) Connecting using Home Assistant")
             self._connection_task = self._ha_create_task(
                 target=device.establish_connection(
                     use_notification_delay=use_notification_delay
                 )
             )
         else:
-            _LOGGER.warning("Normal connecting")
+            _LOGGER.debug(f"({device.device_address}) Connecting")
             self._connection_task = get_event_loop().create_task(
                 device.establish_connection(
                     use_notification_delay=use_notification_delay
@@ -144,12 +144,13 @@ class ConnectionQueue:
     ) -> bool:
         """Wait for a connection, only return True to the last caller and if connected."""
         if self._connection_task is None:
-            _LOGGER.info("First caller connecting")
             self._create_connection_task(
                 device, use_notification_delay=use_notification_delay
             )
         else:
-            _LOGGER.info("Already connecting, waiting for connection")
+            _LOGGER.debug(
+                f"({device.device_address}) Already connecting, waiting for connection"
+            )
 
         # Cancel the previous caller
         if self._last_caller_cancel:
@@ -166,10 +167,8 @@ class ConnectionQueue:
                     self._connection_task.result()
                 )  # Get the result of the completed connection task
                 self._connection_task = None  # Reset the connection task
-                _LOGGER.info("Last caller continuing")
                 return result
             else:
-                _LOGGER.info("Cancelled previous caller")
                 return False
 
         except (BleakOutOfConnectionSlotsError, BleakNotFoundError) as e:
@@ -212,7 +211,10 @@ class MotionDevice:
     ] = None
 
     def __init__(
-        self, device_address: str, ble_device: BLEDevice = None, device_name: str = None
+        self,
+        device_address: str,
+        ble_device: BLEDevice = None,
+        device_name: str = None,
     ) -> None:
         self.device_address = device_address
         self.device_name = device_name if device_name is not None else device_address
@@ -271,20 +273,20 @@ class MotionDevice:
 
         self.cancel_disconnect_timer()
 
-        _LOGGER.info(f"Refreshing disconnect timer to {timeout}s")
+        _LOGGER.debug(
+            f"({self.device_address}) Refreshing disconnect timer to {timeout}s"
+        )
 
         async def _disconnect_later(t: datetime = None):
-            _LOGGER.info(f"Disconnecting after {timeout}s")
+            _LOGGER.debug(f"({self.device_address}) Disconnecting after {timeout}s")
             await self.disconnect()
 
         self._disconnect_time = new_disconnect_time
         if self._ha_call_later:
-            _LOGGER.warning("HA Later")
             self._disconnect_timer = self._ha_call_later(
                 delay=timeout, action=_disconnect_later
             )
         else:
-            _LOGGER.warning("Later")
             self._disconnect_timer = get_event_loop().call_later(
                 timeout, create_task, _disconnect_later()
             )
@@ -295,13 +297,12 @@ class MotionDevice:
         """Callback called by Bleak when a notification is received."""
         decrypted_message: str = MotionCrypt.decrypt(byte_array.hex())
         decrypted_message_bytes: bytes = byte_array.fromhex(decrypted_message)
-        _LOGGER.info("Received message: %s", decrypted_message)
+        _LOGGER.debug(f"({self.device_address}) Received message: {decrypted_message}")
 
         if (
             decrypted_message.startswith(MotionNotificationType.PERCENT.value)
             and self._position_callback is not None
         ):
-            _LOGGER.info("Position notification")
             self.end_position_info.update_end_positions(decrypted_message_bytes[4])
             position_percentage: int = decrypted_message_bytes[6]
             angle: int = decrypted_message_bytes[7]
@@ -313,7 +314,6 @@ class MotionDevice:
             decrypted_message.startswith(MotionNotificationType.STATUS.value)
             and self._status_callback is not None
         ):
-            _LOGGER.info("Updating status")
             position_percentage: int = decrypted_message_bytes[6]
             angle: int = decrypted_message_bytes[7]
             angle_percentage = round(100 * angle / 180)
@@ -340,7 +340,7 @@ class MotionDevice:
 
     def _disconnect_callback(self, client: BleakClient) -> None:
         """Callback called by Bleak when a client disconnects."""
-        _LOGGER.info("Device %s disconnected!", self.device_address)
+        _LOGGER.debug(f"({self.device_address}) Disconnected")
         self.set_connection(MotionConnectionType.DISCONNECTED)
         self._current_bleak_client = None
 
@@ -360,9 +360,8 @@ class MotionDevice:
         self.set_connection(MotionConnectionType.DISCONNECTING)
         self.cancel_disconnect_timer()
         if self._connection_queue.cancel():
-            _LOGGER.info("Cancelled connecting to %s", self.device_address)
+            _LOGGER.debug(f"({self.device_address}) Cancelled connecting")
         if self._current_bleak_client is not None:
-            _LOGGER.info("Disconnecting %s", self.device_address)
             await self._current_bleak_client.disconnect()
             self._current_bleak_client = None
         self.set_connection(MotionConnectionType.DISCONNECTED)
@@ -373,9 +372,7 @@ class MotionDevice:
             return False
 
         self.set_connection(MotionConnectionType.CONNECTING)
-        _LOGGER.info("Connecting to %s", self.device_address)
 
-        _LOGGER.info("Establishing connection")
         bleak_client = await establish_connection(
             BleakClient,
             self._ble_device,
@@ -383,7 +380,7 @@ class MotionDevice:
             max_attempts=SETTING_MAX_CONNECT_ATTEMPTS,
         )
 
-        _LOGGER.info("Connected to %s", self.device_address)
+        _LOGGER.debug(f"({self.device_address}) Connected")
         self._current_bleak_client = bleak_client
         self.set_connection(MotionConnectionType.CONNECTED)
 
@@ -419,21 +416,25 @@ class MotionDevice:
         """Write a message to the command characteristic, return whether or not the command was successfully executed."""
         # Command must be generated just before sending due get_time timing
         command = MotionCrypt.encrypt(command_prefix + MotionCrypt.get_time())
-        _LOGGER.warning("Sending message: %s", MotionCrypt.decrypt(command))
+        _LOGGER.debug(
+            f"({self.device_address}) Sending message: {MotionCrypt.decrypt(command)}"
+        )
         # response=False to solve Unlikely Error: [org.bluez.Error.Failed] Operation failed with ATT error: 0x0e (Unlikely Error)
         # response=True: 0.20s, response=False: 0.0005s
         number_of_tries = 0
         while number_of_tries < SETTING_MAX_COMMAND_ATTEMPTS:
             try:
                 if self._current_bleak_client is not None:
-                    a = time()
+                    before_time = time()
                     await self._current_bleak_client.write_gatt_char(
                         str(MotionCharacteristic.COMMAND.value),
                         bytes.fromhex(command),
                         response=True,
                     )
-                    b = time()
-                    _LOGGER.warning("Received response in %ss", str(b - a))
+                    after_time = time()
+                    _LOGGER.debug(
+                        f"({self.device_address}) Received response in {after_time - before_time}s"
+                    )
                     return True
                 else:
                     return False
@@ -443,7 +444,7 @@ class MotionDevice:
                     raise e
                 else:
                     _LOGGER.warning(
-                        "Error sending message (try %i): %s", number_of_tries, e
+                        f"({self.device_address}) Could not send message (try {number_of_tries}): {e}"
                     )
                     number_of_tries += 1
 
