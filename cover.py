@@ -1,4 +1,5 @@
 """Cover entities for the MotionBlinds BLE integration."""
+from __future__ import annotations
 
 import logging
 import time

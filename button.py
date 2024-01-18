@@ -1,11 +1,11 @@
 """Button entities for the MotionBlinds BLE integration."""
+from __future__ import annotations
 
 import logging
+from collections.abc import Callable
+from dataclasses import dataclass
 
-from homeassistant.components.button import (
-    ButtonEntity,
-    ButtonEntityDescription,
-)
+from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
@@ -21,8 +21,6 @@ from .const import (
     ICON_FAVORITE,
 )
 from .cover import GenericBlind
-from collections.abc import Callable
-from dataclasses import dataclass
 
 _LOGGER = logging.getLogger(__name__)
 

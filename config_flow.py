@@ -6,7 +6,6 @@ import re
 from typing import Any
 
 import voluptuous as vol
-
 from bleak.backends.device import BLEDevice
 
 from homeassistant.components import bluetooth

@@ -1,4 +1,5 @@
 """Constants for MotionBlinds BLE."""
+
 from enum import IntEnum, StrEnum
 
 SETTING_MAX_CONNECT_ATTEMPTS = 5

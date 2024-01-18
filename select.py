@@ -1,4 +1,5 @@
 """Sensor entities for the MotionBlinds BLE integration."""
+from __future__ import annotations
 
 import logging
 from collections.abc import Callable
@@ -6,7 +7,7 @@ from datetime import datetime
 
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import PERCENTAGE, EntityCategory
+from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.event import async_call_later
