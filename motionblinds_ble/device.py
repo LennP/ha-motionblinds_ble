@@ -368,7 +368,8 @@ class MotionDevice:
             await self._current_bleak_client.disconnect()
             _LOGGER.debug(f"({self.device_address}) Disconnected")
             self._current_bleak_client = None
-        self.set_connection(MotionConnectionType.DISCONNECTED)
+        else:
+            self.set_connection(MotionConnectionType.DISCONNECTED)
 
     async def establish_connection(self, use_notification_delay: bool = False) -> bool:
         """Connect to the device, return whether or not the motor is ready for a command."""

@@ -196,13 +196,13 @@ class GenericBlind(CoverEntity):
 
     async def async_connect(self, notification_delay: bool = False) -> bool:
         """Connect to the blind."""
-        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Connecting")
+        # _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Connecting")
         self._use_status_position_update_ui = True
         return await self._device.connect(notification_delay)
 
     async def async_disconnect(self, **kwargs: any) -> None:
         """Disconnect the blind."""
-        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Disconnecting")
+        # _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Disconnecting")
         self._use_status_position_update_ui = False
         await self._device.disconnect()
 
@@ -276,6 +276,7 @@ class GenericBlind(CoverEntity):
     @callback
     def async_update_connection(self, connection_type: MotionConnectionType) -> None:
         """Callback used to update the connection status."""
+        _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) {connection_type.title()}")
         self._attr_connection_type = connection_type
         if self._connection_callback is not None:
             self._connection_callback(connection_type)
