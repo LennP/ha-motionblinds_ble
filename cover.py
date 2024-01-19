@@ -249,7 +249,9 @@ class GenericBlind(CoverEntity):
         )
         await self._device.speed(speed_level)
 
-    def async_update_running(self, running_type: MotionRunningType | None) -> None:
+    def async_update_running(
+        self, running_type: MotionRunningType | None, write_state: bool = True
+    ) -> None:
         """Update whether the blind is running (opening/closing) or not."""
         self._running_type = running_type
         self._attr_is_opening = (
@@ -264,7 +266,8 @@ class GenericBlind(CoverEntity):
         )
         if running_type != MotionRunningType.STILL:
             self._attr_is_closed = None
-        self.async_write_ha_state()
+        if write_state:
+            self.async_write_ha_state()
 
     @callback
     def async_update_position(
@@ -279,11 +282,14 @@ class GenericBlind(CoverEntity):
         )
         if isinstance(self, PositionCalibrationBlind):
             self.async_update_calibration(end_position_info)
+        _LOGGER.warn(self._attr_current_cover_position)
+        _LOGGER.warn(100 - new_position_percentage)
+        # Only update running type to still if position has changed
+        if self._attr_current_cover_position != 100 - new_position_percentage:
+            self.async_update_running(MotionRunningType.STILL, write_state=False)
         self._attr_current_cover_position = 100 - new_position_percentage
         self._attr_current_cover_tilt_position = 100 - new_angle_percentage
         self._attr_is_closed = self._attr_current_cover_position == 0
-        self._attr_is_opening = False
-        self._attr_is_closing = False
         self.async_write_ha_state()
 
     @callback
