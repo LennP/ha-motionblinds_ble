@@ -256,15 +256,15 @@ class GenericBlind(CoverEntity):
         self._running_type = running_type
         self._attr_is_opening = (
             False
-            if running_type == MotionRunningType.STILL
-            else running_type == MotionRunningType.OPENING
+            if running_type is None or running_type is MotionRunningType.STILL
+            else running_type is MotionRunningType.OPENING
         )
         self._attr_is_closing = (
             False
-            if running_type == MotionRunningType.STILL
-            else running_type != MotionRunningType.OPENING
+            if running_type is None or running_type is MotionRunningType.STILL
+            else running_type is not MotionRunningType.OPENING
         )
-        if running_type != MotionRunningType.STILL:
+        if running_type is not MotionRunningType.STILL:
             self._attr_is_closed = None
         if write_state:
             self.async_write_ha_state()
@@ -302,9 +302,7 @@ class GenericBlind(CoverEntity):
         # Reset states if connection is lost, since we don't know the cover position anymore
         if connection_type is MotionConnectionType.DISCONNECTED:
             self._use_status_position_update_ui = False
-            self._attr_is_opening = False
-            self._attr_is_closing = False
-            self._attr_is_closed = None
+            self.async_update_running(None, write_state=False)
             self._attr_current_cover_position = None
             self._attr_current_cover_tilt_position = None
             if self._speed_callback is not None:
