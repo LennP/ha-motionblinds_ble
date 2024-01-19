@@ -282,8 +282,6 @@ class GenericBlind(CoverEntity):
         )
         if isinstance(self, PositionCalibrationBlind):
             self.async_update_calibration(end_position_info)
-        _LOGGER.warn(self._attr_current_cover_position)
-        _LOGGER.warn(100 - new_position_percentage)
         # Only update running type to still if position has changed
         if self._attr_current_cover_position != 100 - new_position_percentage:
             self.async_update_running(MotionRunningType.STILL, write_state=False)
@@ -572,7 +570,9 @@ class PositionCalibrationBlind(PositionBlind):
     _calibration_type: MotionCalibrationType | None = None
     _calibration_callback: Callable[[MotionCalibrationType | None], None] | None = None
 
-    def async_update_running(self, running_type: MotionRunningType | None) -> None:
+    def async_update_running(
+        self, running_type: MotionRunningType | None, write_state: bool = True
+    ) -> None:
         """Update the running status."""
         if (
             self._calibration_type is MotionCalibrationType.UNCALIBRATED
@@ -586,7 +586,7 @@ class PositionCalibrationBlind(PositionBlind):
             if callable(self._calibration_callback):
                 self._calibration_callback(MotionCalibrationType.CALIBRATING)
             self.async_refresh_disconnect_timer(SETTING_CALIBRATION_DISCONNECT_TIME)
-        super().async_update_running(running_type)
+        super().async_update_running(running_type, write_state)
 
     @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
