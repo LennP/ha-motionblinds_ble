@@ -7,18 +7,15 @@
       "connectable": true
     }
   ],
-  "codeowners": [
-    "@LennP",
-    "@jerrybboy"
-  ],
+  "codeowners": ["@LennP", "@jerrybboy"],
   "config_flow": true,
   "dependencies": ["bluetooth_adapters"],
   "issue_tracker": "https://github.com/LennP/HA-MotionBlinds_BLE/",
-  "version": "1.0.0",
   "documentation": "https://www.home-assistant.io/integrations/MotionBlinds_BLE",
   "homekit": {},
   "iot_class": "assumed_state",
   "requirements": [],
   "ssdp": [],
-  "zeroconf": []
+  "zeroconf": [],
+  "version": "1.0.0"
 }

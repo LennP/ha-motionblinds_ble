@@ -1,11 +1,12 @@
 """Cover entities for the MotionBlinds BLE integration."""
 from __future__ import annotations
 
-import logging
 from asyncio import Event
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field
 from functools import partial
+import logging
+from typing import Any
 
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
@@ -41,11 +42,11 @@ from .const import (
     MANUFACTURER,
     MotionBlindType,
     MotionCalibrationType,
-    MotionRunningType,
 )
 from .motionblinds_ble.const import (
     SETTING_CALIBRATION_DISCONNECT_TIME,
     MotionConnectionType,
+    MotionRunningType,
     MotionSpeedLevel,
 )
 from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
@@ -53,12 +54,14 @@ from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 _LOGGER = logging.getLogger(__name__)
 
 
-# Decorator used to perform checks before executing a command
+# Decorator methods that are used to perform checks before executing a command
 DECORATOR_METHOD_RUN_COMMAND = "run_command"
 DECORATOR_METHOD_NO_RUN_COMMAND = "no_run_command"
 
 
 def generic_command_decorator(method_name: str, func: Callable) -> Callable:
+    """Decorate a function by running a method before it."""
+
     async def wrapper(self, *args, **kwargs):
         # Check if the object has an attribute named DECORATOR_FUNCTION
         if hasattr(self, method_name):
@@ -73,18 +76,20 @@ def generic_command_decorator(method_name: str, func: Callable) -> Callable:
     return wrapper
 
 
-# Decorator used for commands that move the motor position
 def run_command(func: Callable) -> Callable:
+    """Decorate a method that moves the motor position."""
     return generic_command_decorator(DECORATOR_METHOD_RUN_COMMAND, func)
 
 
-# Decorator used for commands that do not move the motor position
 def no_run_command(func: Callable) -> Callable:
+    """Decorate a method that does not move the motor position."""
     return generic_command_decorator(DECORATOR_METHOD_NO_RUN_COMMAND, func)
 
 
 @dataclass
 class MotionCoverEntityDescription(CoverEntityDescription):
+    """Entity description of a cover entity with default values."""
+
     key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
     translation_key: str = field(default=CoverDeviceClass.BLIND.value, init=False)
     device_class: CoverDeviceClass = field(default=CoverDeviceClass.SHADE, init=True)
@@ -126,18 +131,18 @@ async def async_setup_entry(
 class GenericBlind(CoverEntity):
     """Representation of a blind."""
 
-    device_address: str = None
-    device_rssi: int = None
-    _device: MotionDevice = None
+    device_address: str
+    device_rssi: int | None = None
+    _device: MotionDevice
     _attr_connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
-    _running_type: MotionRunningType = None
+    _running_type: MotionRunningType | None = None
 
     _use_status_position_update_ui: bool = False
 
-    _battery_callback: Callable[[int], None] = None
-    _speed_callback: Callable[[MotionSpeedLevel], None] = None
-    _connection_callback: Callable[[MotionConnectionType], None] = None
-    _signal_strength_callback: Callable[[int], None] = None
+    _battery_callback: Callable[[int | None], None] | None = None
+    _speed_callback: Callable[[MotionSpeedLevel | None], None] | None = None
+    _connection_callback: Callable[[MotionConnectionType | None], None] | None = None
+    _signal_strength_callback: Callable[[int | None], None] | None = None
 
     def __init__(self, entry: ConfigEntry) -> None:
         """Initialize the blind."""
@@ -162,7 +167,11 @@ class GenericBlind(CoverEntity):
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
-        ble_device = async_ble_device_from_address(self.hass, self.device_address)
+        ble_device = (
+            async_ble_device_from_address(self.hass, self.device_address)
+            if self.device_address
+            else None
+        )
         self._device = MotionDevice(
             self.device_address, ble_device, device_name=self._attr_name
         )
@@ -192,10 +201,10 @@ class GenericBlind(CoverEntity):
     async def async_update(self) -> None:
         """Update state, called by HA if there is a poll interval and by the service homeassistant.update_entity."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Updating entity")
-        await self._device.connect()
+        await self.async_connect()
 
     def async_refresh_disconnect_timer(
-        self, timeout: int = None, force: bool = False
+        self, timeout: int | None = None, force: bool = False
     ) -> None:
         """Refresh the time before the blind is disconnected."""
         self._device.refresh_disconnect_timer(timeout, force)
@@ -205,43 +214,43 @@ class GenericBlind(CoverEntity):
         self._use_status_position_update_ui = True
         return await self._device.connect(notification_delay)
 
-    async def async_disconnect(self, **kwargs: any) -> None:
+    async def async_disconnect(self, **kwargs: Any) -> None:
         """Disconnect the blind."""
         self._use_status_position_update_ui = False
         await self._device.disconnect()
 
     @no_run_command
-    async def async_status_query(self, **kwargs: any) -> None:
+    async def async_status_query(self, **kwargs: Any) -> None:
         """Send a status query to the blind."""
         self._use_status_position_update_ui = True
         if await self._device.status_query():
             self._use_status_position_update_ui = False
 
     @run_command
-    async def async_stop_cover(self, **kwargs: any) -> None:
+    async def async_stop_cover(self, **kwargs: Any) -> None:
         """Stop moving the blind."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Stopping")
         await self._device.stop()
 
     @run_command
-    async def async_favorite(self, **kwargs: any) -> None:
+    async def async_favorite(self, **kwargs: Any) -> None:
         """Move the blind to the favorite position."""
-        self.async_update_running(MotionRunningType.UNKNOWN)
+        self.async_update_running(None)
         _LOGGER.info(
             f"({self.config_entry.data[CONF_MAC_CODE]}) Going to favorite position"
         )
         await self._device.favorite()
 
     @no_run_command
-    async def async_speed(self, speed_level: MotionSpeedLevel, **kwargs: any) -> None:
+    async def async_speed(self, speed_level: MotionSpeedLevel, **kwargs: Any) -> None:
         """Change the speed level of the device."""
         _LOGGER.info(
-            f"({self.config_entry.data[CONF_MAC_CODE]}) Changing speed to {speed_level.name}"
+            f"({self.config_entry.data[CONF_MAC_CODE]}) Changing speed to {speed_level.name.lower()}"
         )
         await self._device.speed(speed_level)
 
-    def async_update_running(self, running_type: MotionRunningType) -> None:
-        """Used to update whether the blind is running (opening/closing) or not."""
+    def async_update_running(self, running_type: MotionRunningType | None) -> None:
+        """Update whether the blind is running (opening/closing) or not."""
         self._running_type = running_type
         self._attr_is_opening = (
             False
@@ -264,7 +273,7 @@ class GenericBlind(CoverEntity):
         new_angle_percentage: int,
         end_position_info: MotionPositionInfo,
     ) -> None:
-        """Callback used to update the position of the blind."""
+        """Update the position of the motor."""
         _LOGGER.debug(
             f"({self.config_entry.data[CONF_MAC_CODE]}) Received position update: {new_position_percentage}, tilt: {new_angle_percentage}"
         )
@@ -279,7 +288,7 @@ class GenericBlind(CoverEntity):
 
     @callback
     def async_update_connection(self, connection_type: MotionConnectionType) -> None:
-        """Callback used to update the connection status."""
+        """Update the connection status."""
         _LOGGER.info(
             f"({self.config_entry.data[CONF_MAC_CODE]}) {connection_type.title()}"
         )
@@ -309,7 +318,7 @@ class GenericBlind(CoverEntity):
         speed_level: MotionSpeedLevel,
         end_position_info: MotionPositionInfo,
     ) -> None:
-        """Callback used to update motor status, e.g. position, tilt and battery percentage."""
+        """Update motor status, e.g. position, tilt and battery percentage."""
         _LOGGER.debug(
             f"({self.config_entry.data[CONF_MAC_CODE]}) Received status update; position: {position_percentage}, tilt: {tilt_percentage}; battery: {battery_percentage}; speed: {speed_level.name}; top position set: {end_position_info.up}; bottom position set: {end_position_info.down}; favorite position set: {end_position_info.favorite}"
         )
@@ -333,6 +342,7 @@ class GenericBlind(CoverEntity):
     def async_update_ble_device(
         self, service_info: BluetoothServiceInfoBleak, change: BluetoothChange
     ) -> None:
+        """Update the BLEDevice."""
         _LOGGER.info(f"({service_info.address}) New BLE device found")
         self._device.set_ble_device(service_info.device)
         self.device_rssi = service_info.advertisement.rssi
@@ -340,25 +350,25 @@ class GenericBlind(CoverEntity):
             self._signal_strength_callback(self.device_rssi)
 
     def async_register_battery_callback(
-        self, _battery_callback: Callable[[int], None]
+        self, _battery_callback: Callable[[int | None], None]
     ) -> None:
         """Register the callback used to update the battery percentage."""
         self._battery_callback = _battery_callback
 
     def async_register_speed_callback(
-        self, _speed_callback: Callable[[MotionSpeedLevel], None]
+        self, _speed_callback: Callable[[MotionSpeedLevel | None], None]
     ) -> None:
         """Register the callback used to update the speed level."""
         self._speed_callback = _speed_callback
 
     def async_register_connection_callback(
-        self, _connection_callback: Callable[[MotionConnectionType], None]
+        self, _connection_callback: Callable[[MotionConnectionType | None], None]
     ) -> None:
         """Register the callback used to update the connection."""
         self._connection_callback = _connection_callback
 
     def async_register_signal_strength_callback(
-        self, _signal_strength_callback: Callable[[int], None]
+        self, _signal_strength_callback: Callable[[int | None], None]
     ) -> None:
         """Register the callback used to update the signal strength."""
         self._signal_strength_callback = _signal_strength_callback
@@ -369,6 +379,7 @@ class GenericBlind(CoverEntity):
         return {ATTR_CONNECTION_TYPE: self._attr_connection_type}
 
     async def before_command(self, *args, **kwargs) -> None:
+        """Run some code before executing any command."""
         if self._attr_connection_type is MotionConnectionType.CONNECTED:
             self.async_refresh_disconnect_timer()
 
@@ -380,18 +391,20 @@ class GenericBlind(CoverEntity):
         *args,
         **kwargs,
     ) -> bool:
+        """Run some code before executing any command that moves the position of the blind."""
         await self.before_command(*args, **kwargs)
         if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = False
         return await func(
             self,
-            ignore_end_positions_not_set=ignore_end_positions_not_set,
             *args,
+            ignore_end_positions_not_set=ignore_end_positions_not_set,
             **kwargs,
         )
 
     # Decorator
     async def no_run_command(self, func: Callable, *args, **kwargs) -> bool:
+        """Run some code before executing any command that does not move the position of the blind."""
         await self.before_command(*args, **kwargs)
         if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = True
@@ -402,7 +415,7 @@ class GenericBlind(CoverEntity):
 class PositionBlind(GenericBlind):
     """Representation of a blind with position capability."""
 
-    _attr_supported_features: [CoverEntityFeature] = (
+    _attr_supported_features: CoverEntityFeature | None = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
         | CoverEntityFeature.STOP
@@ -411,7 +424,7 @@ class PositionBlind(GenericBlind):
 
     @run_command
     async def async_open_cover(
-        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+        self, ignore_end_positions_not_set: bool = False, **kwargs: Any
     ) -> None:
         """Open the blind."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Opening")
@@ -423,7 +436,7 @@ class PositionBlind(GenericBlind):
 
     @run_command
     async def async_close_cover(
-        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+        self, ignore_end_positions_not_set: bool = False, **kwargs: Any
     ) -> None:
         """Close the blind."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Closing")
@@ -435,17 +448,21 @@ class PositionBlind(GenericBlind):
 
     @run_command
     async def async_set_cover_position(
-        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+        self, ignore_end_positions_not_set: bool = False, **kwargs: Any
     ) -> None:
         """Move the blind to a specific position."""
-        new_position = 100 - kwargs.get(ATTR_POSITION)
+        new_position: int | None = (
+            100 - int(kwargs[ATTR_POSITION])
+            if ATTR_POSITION in kwargs and kwargs[ATTR_POSITION] is not None
+            else None
+        )
 
         _LOGGER.info(
             f"({self.config_entry.data[CONF_MAC_CODE]}) Setting position to {new_position}"
         )
         self.async_update_running(
-            MotionRunningType.UNKNOWN
-            if self._attr_current_cover_position is None
+            None
+            if self._attr_current_cover_position is None or new_position is None
             else MotionRunningType.STILL
             if new_position == 100 - self._attr_current_cover_position
             else MotionRunningType.OPENING
@@ -461,7 +478,7 @@ class PositionBlind(GenericBlind):
 class TiltBlind(GenericBlind):
     """Representation of a blind with tilt capability."""
 
-    _attr_supported_features: [CoverEntityFeature] = (
+    _attr_supported_features: CoverEntityFeature | None = (
         CoverEntityFeature.OPEN_TILT
         | CoverEntityFeature.CLOSE_TILT
         | CoverEntityFeature.STOP_TILT
@@ -470,7 +487,7 @@ class TiltBlind(GenericBlind):
 
     @run_command
     async def async_open_cover_tilt(
-        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+        self, ignore_end_positions_not_set: bool = False, **kwargs: Any
     ) -> None:
         """Tilt the blind open."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Tilt opening")
@@ -482,7 +499,7 @@ class TiltBlind(GenericBlind):
 
     @run_command
     async def async_close_cover_tilt(
-        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+        self, ignore_end_positions_not_set: bool = False, **kwargs: Any
     ) -> None:
         """Tilt the blind closed."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Tilt closing")
@@ -493,16 +510,20 @@ class TiltBlind(GenericBlind):
             self.async_update_running(MotionRunningType.STILL)
 
     @run_command
-    async def async_stop_cover_tilt(self, **kwargs: any) -> None:
+    async def async_stop_cover_tilt(self, **kwargs: Any) -> None:
         """Stop tilting the blind."""
         await self.async_stop_cover(**kwargs)
 
     @run_command
     async def async_set_cover_tilt_position(
-        self, ignore_end_positions_not_set: bool = False, **kwargs: any
+        self, ignore_end_positions_not_set: bool = False, **kwargs: Any
     ) -> None:
         """Tilt the blind to a specific position."""
-        new_tilt_position = 100 - kwargs.get(ATTR_TILT_POSITION)
+        new_tilt_position: int | None = (
+            100 - int(kwargs[ATTR_TILT_POSITION])
+            if ATTR_TILT_POSITION in kwargs and kwargs[ATTR_TILT_POSITION] is not None
+            else None
+        )
 
         _LOGGER.info(
             f"({self.config_entry.data[CONF_MAC_CODE]}) Setting tilt position to {new_tilt_position}"
@@ -510,6 +531,7 @@ class TiltBlind(GenericBlind):
         self.async_update_running(
             MotionRunningType.STILL
             if self._attr_current_cover_tilt_position is None
+            or new_tilt_position is None
             or new_tilt_position == 100 - self._attr_current_cover_tilt_position
             else MotionRunningType.OPENING
             if new_tilt_position < 100 - self._attr_current_cover_tilt_position
@@ -526,7 +548,7 @@ class TiltBlind(GenericBlind):
 class PositionTiltBlind(PositionBlind, TiltBlind):
     """Representation of a blind with position & tilt capabilities."""
 
-    _attr_supported_features: [CoverEntityFeature] = (
+    _attr_supported_features: CoverEntityFeature | None = (
         CoverEntityFeature.OPEN
         | CoverEntityFeature.CLOSE
         | CoverEntityFeature.STOP
@@ -541,10 +563,11 @@ class PositionTiltBlind(PositionBlind, TiltBlind):
 class PositionCalibrationBlind(PositionBlind):
     """Representation of a blind with position & calibration capabilities."""
 
-    _calibration_type: MotionCalibrationType = None
-    _calibration_callback: Callable[[MotionCalibrationType], None] = None
+    _calibration_type: MotionCalibrationType | None = None
+    _calibration_callback: Callable[[MotionCalibrationType | None], None] | None = None
 
-    def async_update_running(self, running_type: MotionRunningType) -> None:
+    def async_update_running(self, running_type: MotionRunningType | None) -> None:
+        """Update the running status."""
         if (
             self._calibration_type is MotionCalibrationType.UNCALIBRATED
             and running_type in [MotionRunningType.OPENING, MotionRunningType.CLOSING]
@@ -561,7 +584,7 @@ class PositionCalibrationBlind(PositionBlind):
 
     @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
-        """Update the calibration status of the motor."""
+        """Update the calibration status."""
         new_calibration_type = (
             MotionCalibrationType.CALIBRATED  # Calibrated if end positions are set
             if end_position_info.up
@@ -586,14 +609,14 @@ class PositionCalibrationBlind(PositionBlind):
             self._calibration_callback(new_calibration_type)
 
     def async_register_calibration_callback(
-        self, _calibration_callback: Callable[[MotionCalibrationType], None]
+        self, _calibration_callback: Callable[[MotionCalibrationType | None], None]
     ) -> None:
         """Register the callback used to update the calibration."""
         self._calibration_callback = _calibration_callback
 
     @callback
     def async_update_connection(self, connection_type: MotionConnectionType) -> None:
-        """Callback used to update the connection status."""
+        """Update the connection status."""
         if (
             self._calibration_callback is not None
             and connection_type is MotionConnectionType.DISCONNECTED
@@ -603,17 +626,16 @@ class PositionCalibrationBlind(PositionBlind):
             self._running_type = None
         super().async_update_connection(connection_type)
 
-    async def async_connect(self) -> bool:
+    async def async_connect(self, notification_delay: bool = True) -> bool:
         """Connect to the blind, add a delay before sending the status query."""
-        return await super().async_connect(notification_delay=True)
+        return await super().async_connect(notification_delay=notification_delay)
 
     # Decorator
     async def run_command(self, func: Callable, *args, **kwargs) -> bool:
         """Run before every command that moves a blind, return whether or not to proceed with the command."""
         # Do not throw an exception if the end positions are not set but a move command is given
-        return await super().run_command(
-            func, ignore_end_positions_not_set=True, *args, **kwargs
-        )
+        kwargs["ignore_end_positions_not_set"] = True
+        return await super().run_command(func, *args, **kwargs)
 
 
 class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
@@ -640,7 +662,7 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
 
     @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
-        """Update the calibration status of the motor."""
+        """Update the calibration status."""
         super().async_update_calibration(end_position_info)
         self._calibration_event.set()
 
@@ -649,7 +671,7 @@ class NotCalibratedException(Exception):
     """Exception to indicate the blinds are not calibrated."""
 
 
-BLIND_TO_ENTITY_TYPE: dict[str, GenericBlind] = {
+BLIND_TO_ENTITY_TYPE: dict[str, type[GenericBlind]] = {
     MotionBlindType.ROLLER.value: PositionBlind,
     MotionBlindType.HONEYCOMB.value: PositionBlind,
     MotionBlindType.ROMAN.value: PositionBlind,

@@ -213,8 +213,8 @@ class MotionDevice:
     def __init__(
         self,
         device_address: str,
-        ble_device: BLEDevice = None,
-        device_name: str = None,
+        ble_device: BLEDevice | None = None,
+        device_name: str | None = None,
     ) -> None:
         self.device_address = device_address
         self.device_name = device_name if device_name is not None else device_address
@@ -258,7 +258,7 @@ class MotionDevice:
                 self._disconnect_timer.cancel()
 
     def refresh_disconnect_timer(
-        self, timeout: int = None, force: bool = False
+        self, timeout: int | None = None, force: bool = False
     ) -> None:
         """Refresh the time before the device is disconnected."""
         timeout = SETTING_DISCONNECT_TIME if timeout is None else timeout

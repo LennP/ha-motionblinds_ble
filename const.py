@@ -43,20 +43,17 @@ MANUFACTURER = "MotionBlinds - Coulisse"
 SETTING_MAX_MOTOR_FEEDBACK_TIME = 2  # Seconds
 
 
-class MotionRunningType(StrEnum):
-    CLOSING = "closing"
-    OPENING = "opening"
-    STILL = "still"
-    UNKNOWN = "unknown"
-
-
 class MotionCalibrationType(StrEnum):
+    """Enum for the blind calibration type."""
+
     CALIBRATED = "calibrated"
     UNCALIBRATED = "uncalibrated"
     CALIBRATING = "calibrating"
 
 
 class MotionBlindType(StrEnum):
+    """Enum for the blind type."""
+
     ROLLER = "roller"
     HONEYCOMB = "honeycomb"
     ROMAN = "roman"

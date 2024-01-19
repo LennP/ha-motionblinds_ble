@@ -5,12 +5,13 @@ import logging
 import re
 from typing import Any
 
-import voluptuous as vol
 from bleak.backends.device import BLEDevice
+import voluptuous as vol
 
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-from homeassistant.config_entries import ConfigFlow, FlowResult
+from homeassistant.config_entries import ConfigFlow
+from homeassistant.data_entry_flow import FlowResult
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (
     SelectSelector,
@@ -32,9 +33,9 @@ from .const import (
     MotionBlindType,
 )
 
-_LOGGER = logging.getLogger(__name__)
+CONFIG_SCHEMA = vol.Schema({vol.Required(CONF_MAC_CODE): str})
 
-STEP_USER_DATA_SCHEMA = vol.Schema({vol.Required(CONF_MAC_CODE): str})
+_LOGGER = logging.getLogger(__name__)
 
 
 def is_valid_mac(data: str) -> bool:
@@ -44,12 +45,12 @@ def is_valid_mac(data: str) -> bool:
     return bool(re.match(mac_regex, data))
 
 
-def get_mac_from_local_name(data: str) -> str:
-    """Gets the MAC address from the bluetooth local name."""
+def get_mac_from_local_name(data: str) -> str | None:
+    """Get the MAC address from the bluetooth local name."""
 
     mac_regex = r"^MOTION_([0-9A-Fa-f]{4})$"
     match = re.search(mac_regex, data)
-    return match.group(1) if match else None
+    return str(match.group(1)) if match else None
 
 
 class FlowHandler(ConfigFlow, domain=DOMAIN):
@@ -57,14 +58,15 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
 
     VERSION = 1
 
-    _discovery_info: BluetoothServiceInfoBleak | BLEDevice = None
-    _mac_code: str = None
-    _display_name: str = None
-    _blind_type: MotionBlindType = None
+    _discovery_info: BluetoothServiceInfoBleak | BLEDevice | None = None
+    _mac_code: str | None = None
+    _display_name: str | None = None
+    _blind_type: MotionBlindType | None = None
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
     ) -> FlowResult:
+        """Handle the bluetooth discovery step."""
         _LOGGER.debug(
             "Discovered MotionBlinds bluetooth device: %s", discovery_info.as_dict()
         )
@@ -109,8 +111,11 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Create an entry from a discovery."""
 
+        if self._discovery_info is None:
+            raise DiscoveryError()
+
         return self.async_create_entry(
-            title=self._display_name,
+            title=str(self._display_name),
             data={
                 CONF_ADDRESS: self._discovery_info.address,
                 CONF_LOCAL_NAME: self._discovery_info.name,
@@ -132,17 +137,17 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             except tuple(EXCEPTION_MAP.keys()) as e:
                 errors = {
                     "base": EXCEPTION_MAP[type(e)]
-                    if type(e) in EXCEPTION_MAP.keys()
-                    else type(e)
+                    if type(e) in EXCEPTION_MAP
+                    else str(type(e))
                 }
                 return self.async_show_form(
-                    step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+                    step_id="user", data_schema=CONFIG_SCHEMA, errors=errors
                 )
             return await self.async_step_confirm()
 
         # Return and show error
         return self.async_show_form(
-            step_id="user", data_schema=STEP_USER_DATA_SCHEMA, errors=errors
+            step_id="user", data_schema=CONFIG_SCHEMA, errors=errors
         )
 
     async def async_discover_motionblind(self, mac_code: str) -> None:
@@ -164,7 +169,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         if len(devices) == 0:
             raise NoDevicesFound()
 
-        motion_device: BLEDevice = next(
+        motion_device: BLEDevice | None = next(
             (
                 device
                 for device in devices
@@ -208,6 +213,10 @@ class NoBluetoothAdapter(HomeAssistantError):
 
 class NoDevicesFound(HomeAssistantError):
     """Error to indicate no bluetooth devices could be found."""
+
+
+class DiscoveryError(HomeAssistantError):
+    """Error to indicate there are no device discoveries."""
 
 
 EXCEPTION_MAP = {

@@ -1,9 +1,10 @@
 """Button entities for the MotionBlinds BLE integration."""
 from __future__ import annotations
 
-import logging
-from collections.abc import Callable
+from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
+import logging
+from typing import Any
 
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
 from homeassistant.config_entries import ConfigEntry
@@ -30,18 +31,23 @@ PARALLEL_UPDATES = 0
 
 @dataclass
 class CommandButtonEntityDescription(ButtonEntityDescription):
-    command_callback: Callable[[GenericBlind], None] | None = None
+    """Entity description of a button entity that executes a command upon being pressed."""
+
+    command_callback: Callable[[GenericBlind], Coroutine[Any, Any, None]] | None = None
 
 
 async def command_connect(blind: GenericBlind) -> None:
+    """Connect when the connect button is pressed."""
     await blind.async_connect()
 
 
 async def command_disconnect(blind: GenericBlind) -> None:
+    """Disconnect when the disconnect button is pressed."""
     await blind.async_disconnect()
 
 
 async def command_favorite(blind: GenericBlind) -> None:
+    """Go to the favorite position when the favorite button is pressed."""
     await blind.async_favorite()
 
 
@@ -91,6 +97,8 @@ async def async_setup_entry(
 class GenericCommandButton(ButtonEntity):
     """Representation of a command button."""
 
+    entity_description: CommandButtonEntityDescription
+
     def __init__(
         self, blind: GenericBlind, entity_description: CommandButtonEntityDescription
     ) -> None:
@@ -105,4 +113,5 @@ class GenericCommandButton(ButtonEntity):
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        await self.entity_description.command_callback(self._blind)
+        if callable(self.entity_description.command_callback):
+            await self.entity_description.command_callback(self._blind)

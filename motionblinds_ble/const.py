@@ -17,15 +17,21 @@ EXCEPTION_NO_FAVORITE_POSITION = (
 
 
 class MotionService(StrEnum):
+    """Enum for the BLE service."""
+
     CONTROL = "d973f2e0-b19e-11e2-9e96-0800200c9a66"
 
 
 class MotionCharacteristic(StrEnum):
-    COMMAND = "d973f2e2-b19e-11e2-9e96-0800200c9a66"  # Handle 0x15, d973f2e2-b19e-11e2-9e96-0800200c9a66
-    NOTIFICATION = "d973f2e1-b19e-11e2-9e96-0800200c9a66"  # Handle 0x12, d973f2e1-b19e-11e2-9e96-0800200c9a66
+    """Enum for the BLE characteristic."""
+
+    COMMAND = "d973f2e2-b19e-11e2-9e96-0800200c9a66"
+    NOTIFICATION = "d973f2e1-b19e-11e2-9e96-0800200c9a66"
 
 
 class MotionCommandType(StrEnum):
+    """Enum for the command type."""
+
     OPEN = "03020301"
     CLOSE = "03020302"
     STOP = "03020303"
@@ -42,11 +48,15 @@ class MotionCommandType(StrEnum):
 
 
 class MotionNotificationType(StrEnum):
+    """Enum for the notification type."""
+
     PERCENT = "07040402"
     STATUS = "12040f02"
 
 
 class MotionConnectionType(StrEnum):
+    """Enum for the connection type."""
+
     CONNECTED = "connected"
     CONNECTING = "connecting"
     DISCONNECTED = "disconnected"
@@ -54,12 +64,16 @@ class MotionConnectionType(StrEnum):
 
 
 class MotionRunningType(StrEnum):
+    """Enum for the blind running type."""
+
     OPENING = "opening"
     CLOSING = "closing"
     STILL = "still"
 
 
 class MotionSpeedLevel(IntEnum):
+    """Enum for the speed level."""
+
     LOW = 1
     MEDIUM = 2
     HIGH = 3

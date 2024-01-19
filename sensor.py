@@ -20,12 +20,10 @@ from .const import (
     ATTR_CALIBRATION,
     ATTR_CONNECTION_TYPE,
     ATTR_SIGNAL_STRENGTH,
-    CONF_BLIND_TYPE,
     CONF_MAC_CODE,
     DOMAIN,
     ICON_CALIBRATION,
     ICON_CONNECTION_TYPE,
-    MotionBlindType,
     MotionCalibrationType,
 )
 from .cover import GenericBlind, PositionCalibrationBlind
@@ -85,10 +83,7 @@ async def async_setup_entry(
         ConnectionSensor(blind),
         SignalStrengthSensor(blind),
     ]
-    if blind.config_entry.data[CONF_BLIND_TYPE] in [
-        MotionBlindType.CURTAIN.value,
-        MotionBlindType.VERTICAL.value,
-    ]:
+    if isinstance(blind, PositionCalibrationBlind):
         entities.append(CalibrationSensor(blind))
     async_add_entities(entities)
 
@@ -97,10 +92,10 @@ class BatterySensor(SensorEntity):
     """Representation of a battery sensor."""
 
     def __init__(self, blind: GenericBlind) -> None:
+        """Initialize the battery sensor."""
         _LOGGER.info(
             f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up battery sensor entity"
         )
-        """Initialize the battery sensor."""
         self.entity_description = SENSOR_TYPES[ATTR_BATTERY]
         self._blind = blind
         self._attr_unique_id = f"{blind.unique_id}_{ATTR_BATTERY}"
@@ -115,7 +110,7 @@ class BatterySensor(SensorEntity):
         return await super().async_added_to_hass()
 
     @callback
-    def async_update_battery_percentage(self, battery_percentage: int) -> None:
+    def async_update_battery_percentage(self, battery_percentage: int | None) -> None:
         """Update the battery percentage sensor value."""
         if battery_percentage is None:
             self._attr_native_value = None
@@ -167,9 +162,11 @@ class ConnectionSensor(SensorEntity):
         return await super().async_added_to_hass()
 
     @callback
-    def async_update_connection(self, connection_type: MotionConnectionType) -> None:
+    def async_update_connection(
+        self, connection_type: MotionConnectionType | None
+    ) -> None:
         """Update the connection sensor value."""
-        self._attr_native_value = connection_type.value
+        self._attr_native_value = connection_type.value if connection_type else None
         self.async_write_ha_state()
 
 
@@ -189,11 +186,13 @@ class CalibrationSensor(SensorEntity):
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
-        self._blind.async_register_calibration_callback(self.async_update_calibrated)
+        self._blind.async_register_calibration_callback(self.async_update_calibration)
         return await super().async_added_to_hass()
 
     @callback
-    def async_update_calibrated(self, calibration_type: MotionCalibrationType) -> None:
+    def async_update_calibration(
+        self, calibration_type: MotionCalibrationType | None
+    ) -> None:
         """Update the calibration sensor value."""
         self._attr_native_value = calibration_type
         self.async_write_ha_state()
@@ -222,7 +221,7 @@ class SignalStrengthSensor(SensorEntity):
         return await super().async_added_to_hass()
 
     @callback
-    def async_update_signal_strength(self, signal_strength: int) -> None:
+    def async_update_signal_strength(self, signal_strength: int | None) -> None:
         """Update the calibration sensor value."""
         self._attr_native_value = signal_strength
         self.async_write_ha_state()

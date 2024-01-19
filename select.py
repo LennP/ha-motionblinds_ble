@@ -14,14 +14,12 @@ from homeassistant.helpers.event import async_call_later
 
 from .const import (
     ATTR_SPEED,
-    CONF_BLIND_TYPE,
     CONF_MAC_CODE,
     DOMAIN,
     ICON_SPEED,
     SETTING_MAX_MOTOR_FEEDBACK_TIME,
-    MotionBlindType,
 )
-from .cover import GenericBlind
+from .cover import GenericBlind, PositionCalibrationBlind
 from .motionblinds_ble.const import MotionSpeedLevel
 
 _LOGGER = logging.getLogger(__name__)
@@ -48,10 +46,7 @@ async def async_setup_entry(
 
     blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
 
-    if blind.config_entry.data[CONF_BLIND_TYPE] not in [
-        MotionBlindType.CURTAIN.value,
-        MotionBlindType.VERTICAL.value,
-    ]:
+    if not isinstance(blind, PositionCalibrationBlind):
         async_add_entities([SpeedSelect(blind)])
 
 
@@ -59,7 +54,7 @@ class SpeedSelect(SelectEntity):
     """Representation of a speed select entity."""
 
     _has_selected_speed: bool = False
-    _has_selected_speed_callback: Callable[[], None] = None
+    _has_selected_speed_callback: Callable[[], None] | None = None
 
     def __init__(self, blind: GenericBlind) -> None:
         """Initialize the speed select entity."""
@@ -70,7 +65,7 @@ class SpeedSelect(SelectEntity):
         self._blind = blind
         self._attr_unique_id: str = f"{blind.unique_id}_speed"
         self._attr_device_info = blind.device_info
-        self._attr_current_option: str = None
+        self._attr_current_option: str | None = None
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
@@ -78,7 +73,7 @@ class SpeedSelect(SelectEntity):
         return await super().async_added_to_hass()
 
     @callback
-    def async_update_speed(self, speed_level: MotionSpeedLevel) -> None:
+    def async_update_speed(self, speed_level: MotionSpeedLevel | None) -> None:
         """Update the speed level."""
         if speed_level is None:
             # Disable callback when the connection has been closed
