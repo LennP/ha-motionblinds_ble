@@ -38,21 +38,6 @@ _LOGGER = logging.getLogger(__name__)
 CONFIG_SCHEMA = vol.Schema({vol.Required(CONF_MAC_CODE): str})
 
 
-def is_valid_mac(data: str) -> bool:
-    """Validate the provided MAC address."""
-
-    mac_regex = r"^[0-9A-Fa-f]{4}$"
-    return bool(re.match(mac_regex, data))
-
-
-def get_mac_from_local_name(data: str) -> str | None:
-    """Get the MAC address from the bluetooth local name."""
-
-    mac_regex = r"^MOTION_([0-9A-Fa-f]{4})$"
-    match = re.search(mac_regex, data)
-    return str(match.group(1)) if match else None
-
-
 class FlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for MotionBlinds BLE."""
 
@@ -78,51 +63,8 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         self._display_name = f"MotionBlind {self._mac_code}"
         self.context["local_name"] = discovery_info.name
         self.context["title_placeholders"] = {"name": self._display_name}
+
         return await self.async_step_confirm()
-
-    async def async_step_confirm(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
-        """Confirm a single device."""
-        if user_input is not None:
-            self._blind_type = user_input[CONF_BLIND_TYPE]
-            return await self._async_create_entry_from_discovery(user_input)
-
-        return self.async_show_form(
-            step_id="confirm",
-            data_schema=vol.Schema(
-                {
-                    vol.Required(CONF_BLIND_TYPE): SelectSelector(
-                        SelectSelectorConfig(
-                            options=[
-                                blind_type.value for blind_type in MotionBlindType
-                            ],
-                            translation_key=CONF_BLIND_TYPE,
-                            mode=SelectSelectorMode.DROPDOWN,
-                        )
-                    )
-                }
-            ),
-            description_placeholders={"display_name": self._display_name},
-        )
-
-    async def _async_create_entry_from_discovery(
-        self, user_input: dict[str, Any]
-    ) -> FlowResult:
-        """Create an entry from a discovery."""
-
-        if self._discovery_info is None:
-            raise DiscoveryError()
-
-        return self.async_create_entry(
-            title=str(self._display_name),
-            data={
-                CONF_ADDRESS: self._discovery_info.address,
-                CONF_LOCAL_NAME: self._discovery_info.name,
-                CONF_MAC_CODE: self._mac_code,
-                CONF_BLIND_TYPE: self._blind_type,
-            },
-        )
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
@@ -145,14 +87,54 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
                 )
             return await self.async_step_confirm()
 
-        # Return and show error
         return self.async_show_form(
             step_id="user", data_schema=CONFIG_SCHEMA, errors=errors
+        )
+
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Confirm a single device."""
+        if user_input is not None:
+            if self._discovery_info is None:
+                return self.async_show_form(
+                    step_id="user",
+                    data_schema=CONFIG_SCHEMA,
+                    errors={"base": EXCEPTION_MAP[NoDevicesFound]},
+                )
+            self._blind_type = user_input[CONF_BLIND_TYPE]
+            return self.async_create_entry(
+                title=str(self._display_name),
+                data={
+                    CONF_ADDRESS: self._discovery_info.address,
+                    CONF_LOCAL_NAME: self._discovery_info.name,
+                    CONF_MAC_CODE: self._mac_code,
+                    CONF_BLIND_TYPE: self._blind_type,
+                },
+            )
+
+        return self.async_show_form(
+            step_id="confirm",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(CONF_BLIND_TYPE): SelectSelector(
+                        SelectSelectorConfig(
+                            options=[
+                                blind_type.value for blind_type in MotionBlindType
+                            ],
+                            translation_key=CONF_BLIND_TYPE,
+                            mode=SelectSelectorMode.DROPDOWN,
+                        )
+                    )
+                }
+            ),
+            description_placeholders={"display_name": self._display_name},
         )
 
     async def async_discover_motionblind(self, mac_code: str) -> None:
         """Discover MotionBlinds initialized by the user."""
         if not is_valid_mac(mac_code):
+            _LOGGER.error(f"Invalid MAC code: {mac_code.upper()}")
             raise InvalidMACCode()
 
         count = bluetooth.async_scanner_count(self.hass, connectable=True)
@@ -160,13 +142,14 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             self.hass.async_create_task(
                 self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)
             )
-            _LOGGER.error("Could not find any bluetooth adapter")
+            _LOGGER.error("No bluetooth adapter found")
             raise NoBluetoothAdapter()
 
         bleak_scanner = bluetooth.async_get_scanner(self.hass)
         devices = await bleak_scanner.discover()
 
         if len(devices) == 0:
+            _LOGGER.error("Could not find any bluetooth devices")
             raise NoDevicesFound()
 
         motion_device: BLEDevice | None = next(
@@ -185,14 +168,32 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         if motion_device:
             unique_id = motion_device.address
             if any(entry.unique_id == unique_id for entry in existing_entries):
-                _LOGGER.warning("Already configured")
+                _LOGGER.error(
+                    f"Device with MAC code {mac_code} has already been configured"
+                )
                 raise AlreadyConfigured()
             await self.async_set_unique_id(unique_id, raise_on_progress=False)
             self._discovery_info = motion_device
             self._mac_code = mac_code.upper()
             self._display_name = f"MotionBlind {self._mac_code}"
         else:
+            _LOGGER.error(f"Could not find a motor with MAC code: {mac_code.upper()}")
             raise CouldNotFindMotor()
+
+
+def is_valid_mac(data: str) -> bool:
+    """Validate the provided MAC address."""
+
+    mac_regex = r"^[0-9A-Fa-f]{4}$"
+    return bool(re.match(mac_regex, data))
+
+
+def get_mac_from_local_name(data: str) -> str | None:
+    """Get the MAC address from the bluetooth local name."""
+
+    mac_regex = r"^MOTION_([0-9A-Fa-f]{4})$"
+    match = re.search(mac_regex, data)
+    return str(match.group(1)) if match else None
 
 
 class CouldNotFindMotor(HomeAssistantError):
@@ -213,10 +214,6 @@ class NoBluetoothAdapter(HomeAssistantError):
 
 class NoDevicesFound(HomeAssistantError):
     """Error to indicate no bluetooth devices could be found."""
-
-
-class DiscoveryError(HomeAssistantError):
-    """Error to indicate there are no device discoveries."""
 
 
 EXCEPTION_MAP = {
