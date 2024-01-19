@@ -6,10 +6,13 @@ import logging
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import Platform
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_MAC_CODE, DOMAIN
 from .motionblinds_ble.crypt import MotionCrypt
+
+_LOGGER = logging.getLogger(__name__)
 
 PLATFORMS: list[Platform] = [
     Platform.COVER,
@@ -18,7 +21,7 @@ PLATFORMS: list[Platform] = [
     Platform.BUTTON,
 ]
 
-_LOGGER = logging.getLogger(__name__)
+CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)
 
 
 async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:

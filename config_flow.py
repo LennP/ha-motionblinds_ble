@@ -33,9 +33,9 @@ from .const import (
     MotionBlindType,
 )
 
-CONFIG_SCHEMA = vol.Schema({vol.Required(CONF_MAC_CODE): str})
-
 _LOGGER = logging.getLogger(__name__)
+
+CONFIG_SCHEMA = vol.Schema({vol.Required(CONF_MAC_CODE): str})
 
 
 def is_valid_mac(data: str) -> bool:
