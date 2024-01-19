@@ -50,7 +50,7 @@ class MotionCommandType(StrEnum):
 class MotionNotificationType(StrEnum):
     """Enum for the notification type."""
 
-    PERCENT = "07040402"
+    POSITION = "07040402"
     STATUS = "12040f02"
 
 

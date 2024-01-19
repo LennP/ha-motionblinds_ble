@@ -315,12 +315,12 @@ class GenericBlind(CoverEntity):
         position_percentage: int,
         tilt_percentage: int,
         battery_percentage: int,
-        speed_level: MotionSpeedLevel,
+        speed_level: MotionSpeedLevel | None,
         end_position_info: MotionPositionInfo,
     ) -> None:
         """Update motor status, e.g. position, tilt and battery percentage."""
         _LOGGER.debug(
-            f"({self.config_entry.data[CONF_MAC_CODE]}) Received status update; position: {position_percentage}, tilt: {tilt_percentage}; battery: {battery_percentage}; speed: {speed_level.name}; top position set: {end_position_info.up}; bottom position set: {end_position_info.down}; favorite position set: {end_position_info.favorite}"
+            f"({self.config_entry.data[CONF_MAC_CODE]}) Received status update; position: {position_percentage}, tilt: {tilt_percentage}; battery: {battery_percentage}; speed: {speed_level.name if speed_level is not None else None}; top position set: {end_position_info.up}; bottom position set: {end_position_info.down}; favorite position set: {end_position_info.favorite}"
         )
         # Only update position based on feedback when necessary and end positions are set, otherwise cover UI will jump around
         if self._use_status_position_update_ui and end_position_info.up:
@@ -602,7 +602,7 @@ class PositionCalibrationBlind(PositionBlind):
             self._calibration_type is MotionCalibrationType.CALIBRATING
             and new_calibration_type is not MotionCalibrationType.CALIBRATING
         ):
-            # Refresh disconnect timer to default value if finished calibrating
+            # Refresh disconnect timeout to default value if finished calibrating
             self.async_refresh_disconnect_timer(force=True)
         self._calibration_type = new_calibration_type
         if callable(self._calibration_callback):

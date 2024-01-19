@@ -1,7 +1,6 @@
 """Device for MotionBlinds BLE."""
 from __future__ import annotations
 
-import logging
 from asyncio import (
     FIRST_COMPLETED,
     Future,
@@ -15,7 +14,9 @@ from asyncio import (
 from collections.abc import Callable, Coroutine
 from dataclasses import dataclass
 from datetime import datetime
+import logging
 from time import time, time_ns
+from typing import Any, Union
 
 from bleak import BleakClient
 from bleak.backends.characteristic import BleakGATTCharacteristic
@@ -47,6 +48,8 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def requires_end_positions(func: Callable) -> Callable:
+    """Decorate a function making it require end positions."""
+
     async def wrapper(self: MotionDevice, *args, **kwargs):
         ignore_end_positions_not_set = kwargs.get("ignore_end_positions_not_set", False)
 
@@ -67,6 +70,8 @@ def requires_end_positions(func: Callable) -> Callable:
 
 
 def requires_favorite_position(func: Callable) -> Callable:
+    """Decorate a function making it require a favorite position."""
+
     async def wrapper(self: MotionDevice, *args, **kwargs):
         if (
             self.end_position_info is not None
@@ -85,6 +90,8 @@ def requires_favorite_position(func: Callable) -> Callable:
 
 
 def requires_connection(func: Callable) -> Callable:
+    """Decorate a function making it require a connection."""
+
     async def wrapper(self: MotionDevice, *args, **kwargs):
         if not await self.connect():
             return False
@@ -95,16 +102,20 @@ def requires_connection(func: Callable) -> Callable:
 
 @dataclass
 class MotionPositionInfo:
+    """Information on whether end positions and favorite position are set."""
+
     up: bool
     down: bool
     favorite: bool
 
     def __init__(self, end_positions_byte: int, favorite_bytes: int) -> None:
+        """Initialize the MotionPositionInfo."""
         self.up = bool(end_positions_byte & 0x08)
         self.down = bool(end_positions_byte & 0x04)
         self.favorite = bool(favorite_bytes & 0x8000)
 
     def update_end_positions(self, end_positions_byte: int):
+        """Update the end positions."""
         self.up = bool(end_positions_byte & 0x08)
         self.down = bool(end_positions_byte & 0x04)
 
@@ -112,9 +123,9 @@ class MotionPositionInfo:
 class ConnectionQueue:
     """Class used to ensure the first caller connects, but the last caller's command goes through after connection."""
 
-    _ha_create_task: Callable[[Coroutine], Task] = None
-    _connection_task: Task = None
-    _last_caller_cancel: Future = None
+    _ha_create_task: Callable[[Coroutine], Task] | None = None
+    _connection_task: Task | Any | None = None
+    _last_caller_cancel: Future | None = None
 
     def set_ha_create_task(self, ha_create_task: Callable[[Coroutine], Task]) -> None:
         """Set the Home Assistant create_task function."""
@@ -122,29 +133,26 @@ class ConnectionQueue:
 
     def _create_connection_task(
         self, device: MotionDevice, use_notification_delay: bool = False
-    ) -> None:
+    ) -> Task | Any:
         """Create a connection task."""
         if self._ha_create_task:
             _LOGGER.debug(f"({device.device_address}) Connecting using Home Assistant")
-            self._connection_task = self._ha_create_task(
+            return self._ha_create_task(
                 target=device.establish_connection(
                     use_notification_delay=use_notification_delay
                 )
-            )
-        else:
-            _LOGGER.debug(f"({device.device_address}) Connecting")
-            self._connection_task = get_event_loop().create_task(
-                device.establish_connection(
-                    use_notification_delay=use_notification_delay
-                )
-            )
+            )  # type: ignore[call-arg]
+        _LOGGER.debug(f"({device.device_address}) Connecting")
+        return get_event_loop().create_task(
+            device.establish_connection(use_notification_delay=use_notification_delay)
+        )
 
     async def wait_for_connection(
         self, device: MotionDevice, use_notification_delay: bool = False
     ) -> bool:
         """Wait for a connection, only return True to the last caller and if connected."""
         if self._connection_task is None:
-            self._create_connection_task(
+            self._connection_task = self._create_connection_task(
                 device, use_notification_delay=use_notification_delay
             )
         else:
@@ -158,6 +166,8 @@ class ConnectionQueue:
         self._last_caller_cancel = Future()
 
         try:
+            done: set[Union[Task, Future]]
+            pending: set[Union[Task, Future]]
             done, pending = await wait(
                 [self._connection_task, self._last_caller_cancel],
                 return_when=FIRST_COMPLETED,
@@ -168,8 +178,7 @@ class ConnectionQueue:
                 )  # Get the result of the completed connection task
                 self._connection_task = None  # Reset the connection task
                 return result
-            else:
-                return False
+            return False
 
         except (BleakOutOfConnectionSlotsError, BleakNotFoundError) as e:
             device.set_connection(MotionConnectionType.DISCONNECTED)
@@ -188,27 +197,27 @@ class ConnectionQueue:
 class MotionDevice:
     """Class used to control a MotionBlinds device."""
 
-    device_name: str = None
-    device_address: str = None
-    end_position_info: MotionPositionInfo = None
-    _ble_device: BLEDevice = None
-    _current_bleak_client: BleakClient = None
+    device_name: str | None = None
+    device_address: str
+    end_position_info: MotionPositionInfo | None = None
+    _ble_device: BLEDevice
+    _current_bleak_client: BleakClient | None = None
     _connection_type: MotionConnectionType = MotionConnectionType.DISCONNECTED
-    _connection_queue: ConnectionQueue = None
+    _connection_queue: ConnectionQueue
 
-    _disconnect_time: int = None
-    _disconnect_timer: TimerHandle | Callable = None
+    _disconnect_time: float | None = None
+    _disconnect_timer: TimerHandle | Callable | None = None
 
     # Callbacks that are used to interface with HA
-    _ha_call_later: Callable[[int, Coroutine], Callable] = None
+    _ha_call_later: Callable[[int, Coroutine], Callable] | None = None
 
     # Regular callbacks
-    _position_callback: Callable[[int, int, MotionPositionInfo], None] = None
-    running_callback: Callable[[MotionRunningType], None] = None
-    _connection_callback: Callable[[MotionConnectionType], None] = None
+    _position_callback: Callable[[int, int, MotionPositionInfo], None] | None = None
+    running_callback: Callable[[MotionRunningType], None] | None = None
+    _connection_callback: Callable[[MotionConnectionType], None] | None = None
     _status_callback: Callable[
-        [int, int, int, MotionSpeedLevel, MotionPositionInfo], None
-    ] = None
+        [int, int, int, MotionSpeedLevel | None, MotionPositionInfo], None
+    ] | None = None
 
     def __init__(
         self,
@@ -216,6 +225,7 @@ class MotionDevice:
         ble_device: BLEDevice | None = None,
         device_name: str | None = None,
     ) -> None:
+        """Initialize the MotionDevice."""
         self.device_address = device_address
         self.device_name = device_name if device_name is not None else device_address
         self._connection_queue = ConnectionQueue()
@@ -250,8 +260,9 @@ class MotionDevice:
         self._connection_type = connection_type
 
     def cancel_disconnect_timer(self) -> None:
+        """Cancel the disconnect timeout."""
         if self._disconnect_timer:
-            # Cancel current timer
+            # Cancel current timeout
             if callable(self._disconnect_timer):
                 self._disconnect_timer()
             else:
@@ -262,32 +273,33 @@ class MotionDevice:
     ) -> None:
         """Refresh the time before the device is disconnected."""
         timeout = SETTING_DISCONNECT_TIME if timeout is None else timeout
-        # Don't refresh if the current disconnect timer has a larger timeout
+        # Don't refresh if the existing timeout is larger than the one of this call unless forced
         new_disconnect_time = time_ns() // 1e6 + timeout * 1e3
         if (
             not force
             and self._disconnect_timer is not None
+            and self._disconnect_time is not None
             and self._disconnect_time > new_disconnect_time
         ):
             return
 
         self.cancel_disconnect_timer()
 
-        async def _disconnect_later(t: datetime = None):
+        async def _disconnect_later(t: datetime | None = None):
             _LOGGER.debug(f"({self.device_address}) Disconnecting after {timeout}s")
             await self.disconnect()
 
         self._disconnect_time = new_disconnect_time
         if self._ha_call_later:
             _LOGGER.debug(
-                f"({self.device_address}) Refreshing disconnect timer to {timeout}s using Home Assistant"
+                f"({self.device_address}) Refreshing disconnect timeout to {timeout}s using Home Assistant"
             )
             self._disconnect_timer = self._ha_call_later(
                 delay=timeout, action=_disconnect_later
-            )
+            )  # type: ignore[call-arg]
         else:
             _LOGGER.debug(
-                f"({self.device_address}) Refreshing disconnect timer to {timeout}s"
+                f"({self.device_address}) Refreshing disconnect timeout to {timeout}s"
             )
             self._disconnect_timer = get_event_loop().call_later(
                 timeout, create_task, _disconnect_later()
@@ -296,21 +308,23 @@ class MotionDevice:
     def _notification_callback(
         self, char: BleakGATTCharacteristic, byte_array: bytearray
     ) -> None:
-        """Callback called by Bleak when a notification is received."""
+        """Handle a received notification."""
         decrypted_message: str = MotionCrypt.decrypt(byte_array.hex())
         decrypted_message_bytes: bytes = byte_array.fromhex(decrypted_message)
         _LOGGER.debug(f"({self.device_address}) Received message: {decrypted_message}")
 
         if (
-            decrypted_message.startswith(MotionNotificationType.PERCENT.value)
+            decrypted_message.startswith(MotionNotificationType.POSITION.value)
             and self._position_callback is not None
         ):
             self.end_position_info.update_end_positions(decrypted_message_bytes[4])
-            position_percentage: int = decrypted_message_bytes[6]
-            angle: int = decrypted_message_bytes[7]
-            angle_percentage = round(100 * angle / 180)
+            position_position_percentage: int = decrypted_message_bytes[6]
+            position_angle: int = decrypted_message_bytes[7]
+            position_angle_percentage: int = round(100 * position_angle / 180)
             self._position_callback(
-                position_percentage, angle_percentage, self.end_position_info
+                position_position_percentage,
+                position_angle_percentage,
+                self.end_position_info,
             )
         elif (
             decrypted_message.startswith(MotionNotificationType.STATUS.value)
@@ -318,7 +332,7 @@ class MotionDevice:
         ):
             position_percentage: int = decrypted_message_bytes[6]
             angle: int = decrypted_message_bytes[7]
-            angle_percentage = round(100 * angle / 180)
+            angle_percentage: int = round(100 * angle / 180)
             battery_percentage: int = decrypted_message_bytes[17]
             self.end_position_info: MotionPositionInfo = MotionPositionInfo(
                 decrypted_message_bytes[4],
@@ -327,7 +341,7 @@ class MotionDevice:
                 ),
             )
             try:
-                speed_level: MotionSpeedLevel = MotionSpeedLevel(
+                speed_level: MotionSpeedLevel | None = MotionSpeedLevel(
                     decrypted_message_bytes[12]
                 )
             except ValueError:
@@ -341,7 +355,7 @@ class MotionDevice:
             )
 
     def _disconnect_callback(self, client: BleakClient) -> None:
-        """Callback called by Bleak when a client disconnects."""
+        """Handle a BleakClient disconnect."""
         _LOGGER.debug(f"({self.device_address}) Disconnected")
         self.set_connection(MotionConnectionType.DISCONNECTED)
         self._current_bleak_client = None
@@ -353,12 +367,11 @@ class MotionDevice:
             return await self._connection_queue.wait_for_connection(
                 self, use_notification_delay=use_notification_delay
             )
-        else:
-            self.refresh_disconnect_timer()
+        self.refresh_disconnect_timer()
         return True
 
     async def disconnect(self) -> None:
-        """Called by Home Assistant after X time."""
+        """Disconnect from the device."""
         self.set_connection(MotionConnectionType.DISCONNECTING)
         self.cancel_disconnect_timer()
         if self._connection_queue.cancel():
@@ -441,17 +454,16 @@ class MotionDevice:
                         f"({self.device_address}) Received response in {after_time - before_time}s"
                     )
                     return True
-                else:
-                    return False
+                return False
             except BleakError as e:
                 if number_of_tries == SETTING_MAX_COMMAND_ATTEMPTS:
                     await self.disconnect()
                     raise e
-                else:
-                    _LOGGER.warning(
-                        f"({self.device_address}) Could not send message (try {number_of_tries}): {e}"
-                    )
-                    number_of_tries += 1
+                _LOGGER.warning(
+                    f"({self.device_address}) Could not send message (try #{number_of_tries}): {e}"
+                )
+                number_of_tries += 1
+        return False
 
     @requires_connection
     async def user_query(self) -> bool:
@@ -490,7 +502,7 @@ class MotionDevice:
     async def percentage(
         self, percentage: int, ignore_end_positions_not_set: bool = False
     ) -> bool:
-        """Moves the device to a specific percentage."""
+        """Move the device to a specific percentage."""
         assert not percentage < 0 and not percentage > 100
         command_prefix = (
             str(MotionCommandType.PERCENT.value) + hex(percentage)[2:].zfill(2) + "00"
@@ -541,8 +553,6 @@ class MotionDevice:
     @requires_end_positions
     async def open_tilt(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Tilt the device open."""
-        # Step or fully tilt?
-        # command_prefix = str(MotionCommandType.OPEN_TILT.value)
         command_prefix = str(MotionCommandType.ANGLE.value) + "00" + hex(0)[2:].zfill(2)
         return await self._send_command(command_prefix)
 
@@ -550,8 +560,6 @@ class MotionDevice:
     @requires_end_positions
     async def close_tilt(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Tilt the device closed."""
-        # Step or fully tilt?
-        # command_prefix = str(MotionCommandType.CLOSE_TILT.value)
         command_prefix = (
             str(MotionCommandType.ANGLE.value) + "00" + hex(180)[2:].zfill(2)
         )
@@ -577,7 +585,9 @@ class MotionDevice:
 
     def register_status_callback(
         self,
-        callback: Callable[[int, int, int, MotionSpeedLevel, MotionPositionInfo], None],
+        callback: Callable[
+            [int, int, int, MotionSpeedLevel | None, MotionPositionInfo], None
+        ],
     ) -> None:
         """Register the callback used to update the motor status, e.g. position, tilt and battery percentage."""
         self._status_callback = callback

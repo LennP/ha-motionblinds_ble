@@ -1,1 +1,1 @@
-"""MotionBlinds BLE"""
+"""MotionBlinds BLE."""

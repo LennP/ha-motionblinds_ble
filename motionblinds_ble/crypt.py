@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import datetime
+from datetime import tzinfo
 
 from Crypto.Cipher import AES
 from Crypto.Cipher._mode_ecb import EcbMode
@@ -12,17 +13,19 @@ from pytz import timezone
 class MotionCrypt:
     """Used for the encryption & decryption of bluetooth messages."""
 
-    tz: timezone = None
+    tz: tzinfo | None = None
 
-    encryption_key: bytes = "a3q8r8c135sqbn66".encode("utf-8")
+    encryption_key: bytes = b"a3q8r8c135sqbn66"
     cipher: EcbMode = AES.new(encryption_key, AES.MODE_ECB)
 
     @staticmethod
     def set_timezone(tz: str) -> None:
+        """Set the timezone for encryption, using a string like 'Europe/Amsterdam'."""
         MotionCrypt.tz = timezone(tz)
 
     @staticmethod
     def encrypt(plaintext_hex: str) -> str:
+        """Encrypt a hex string."""
         plaintext_bytes = bytes.fromhex(plaintext_hex)
         cipheredtext_bytes = MotionCrypt.cipher.encrypt(
             pad(plaintext_bytes, AES.block_size)
@@ -32,6 +35,7 @@ class MotionCrypt:
 
     @staticmethod
     def decrypt(cipheredtext_hex: str) -> str:
+        """Decrypt a hex string."""
         cipheredtext_bytes = bytes.fromhex(cipheredtext_hex)
         plaintext_bytes = unpad(
             MotionCrypt.cipher.decrypt(cipheredtext_bytes), AES.block_size
@@ -41,10 +45,12 @@ class MotionCrypt:
 
     @staticmethod
     def _format_hex(number: int, number_of_chars: int = 2) -> str:
+        """Format a number as a hex string with a given number of characters."""
         return hex(number & 2 ** (number_of_chars * 4) - 1)[2:].zfill(number_of_chars)
 
     @staticmethod
     def get_time() -> str:
+        """Get the current time string."""
         if not MotionCrypt.tz:
             raise TimezoneNotSetException(
                 "Motion encryption requires a valid timezone."
@@ -79,14 +85,4 @@ class MotionCrypt:
 
 
 class TimezoneNotSetException(Exception):
-    pass
-
-
-if __name__ == "__main__":
-    initial = "244e1d963ebdc5453f43e896465b5bcf"
-    print(f"Initial: {initial}")
-    decrypted = MotionCrypt.decrypt(initial)
-    print(f"Decrypted: {decrypted}")
-    encrypted = MotionCrypt.encrypt(decrypted)
-    print(f"Encrypted: {encrypted}")
-    print(f"Time: {MotionCrypt.get_time()}")
+    """Error to indicate the timezone was not set."""
