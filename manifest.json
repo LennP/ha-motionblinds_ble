@@ -16,6 +16,5 @@
   "issue_tracker": "https://github.com/LennP/HA-MotionBlinds_BLE/",
   "requirements": [],
   "ssdp": [],
-  "zeroconf": [],
-  "version": "1.0.0"
+  "zeroconf": []
 }

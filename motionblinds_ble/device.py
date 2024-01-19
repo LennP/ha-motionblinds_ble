@@ -106,13 +106,16 @@ class MotionPositionInfo:
 
     up: bool
     down: bool
-    favorite: bool
+    favorite: bool | None = None
 
-    def __init__(self, end_positions_byte: int, favorite_bytes: int) -> None:
+    def __init__(
+        self, end_positions_byte: int, favorite_bytes: int | None = None
+    ) -> None:
         """Initialize the MotionPositionInfo."""
         self.up = bool(end_positions_byte & 0x08)
         self.down = bool(end_positions_byte & 0x04)
-        self.favorite = bool(favorite_bytes & 0x8000)
+        if favorite_bytes is not None:
+            self.favorite = bool(favorite_bytes & 0x8000)
 
     def update_end_positions(self, end_positions_byte: int):
         """Update the end positions."""
@@ -317,7 +320,12 @@ class MotionDevice:
             decrypted_message.startswith(MotionNotificationType.POSITION.value)
             and self._position_callback is not None
         ):
-            self.end_position_info.update_end_positions(decrypted_message_bytes[4])
+            if self.end_position_info is not None:
+                self.end_position_info.update_end_positions(decrypted_message_bytes[4])
+            else:
+                self.end_position_info: MotionPositionInfo = MotionPositionInfo(
+                    decrypted_message_bytes[4]
+                )
             position_position_percentage: int = decrypted_message_bytes[6]
             position_angle: int = decrypted_message_bytes[7]
             position_angle_percentage: int = round(100 * position_angle / 180)
@@ -337,7 +345,7 @@ class MotionDevice:
             self.end_position_info: MotionPositionInfo = MotionPositionInfo(
                 decrypted_message_bytes[4],
                 int.from_bytes(
-                    [decrypted_message_bytes[6], decrypted_message_bytes[7]]
+                    [decrypted_message_bytes[14], decrypted_message_bytes[15]]
                 ),
             )
             try:
