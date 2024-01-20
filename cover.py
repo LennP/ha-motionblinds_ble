@@ -431,7 +431,9 @@ class PositionBlind(GenericBlind):
         """Open the blind."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Opening")
         self.async_update_running(MotionRunningType.OPENING)
-        if await self._device.open(ignore_end_positions_not_set):
+        if await self._device.open(
+            ignore_end_positions_not_set=ignore_end_positions_not_set
+        ):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -443,7 +445,9 @@ class PositionBlind(GenericBlind):
         """Close the blind."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Closing")
         self.async_update_running(MotionRunningType.CLOSING)
-        if await self._device.close(ignore_end_positions_not_set):
+        if await self._device.close(
+            ignore_end_positions_not_set=ignore_end_positions_not_set
+        ):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -471,7 +475,9 @@ class PositionBlind(GenericBlind):
             if new_position < 100 - self._attr_current_cover_position
             else MotionRunningType.CLOSING
         )
-        if await self._device.percentage(new_position, ignore_end_positions_not_set):
+        if await self._device.percentage(
+            new_position, ignore_end_positions_not_set=ignore_end_positions_not_set
+        ):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -494,7 +500,9 @@ class TiltBlind(GenericBlind):
         """Tilt the blind open."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Tilt opening")
         self.async_update_running(MotionRunningType.OPENING)
-        if await self._device.open_tilt(ignore_end_positions_not_set):
+        if await self._device.open_tilt(
+            ignore_end_positions_not_set=ignore_end_positions_not_set
+        ):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -506,7 +514,9 @@ class TiltBlind(GenericBlind):
         """Tilt the blind closed."""
         _LOGGER.info(f"({self.config_entry.data[CONF_MAC_CODE]}) Tilt closing")
         self.async_update_running(MotionRunningType.CLOSING)
-        if await self._device.close_tilt(ignore_end_positions_not_set):
+        if await self._device.close_tilt(
+            ignore_end_positions_not_set=ignore_end_positions_not_set
+        ):
             self.async_write_ha_state()
         else:
             self.async_update_running(MotionRunningType.STILL)
@@ -540,7 +550,7 @@ class TiltBlind(GenericBlind):
             else MotionRunningType.CLOSING
         )
         if await self._device.percentage_tilt(
-            new_tilt_position, ignore_end_positions_not_set
+            new_tilt_position, ignore_end_positions_not_set=ignore_end_positions_not_set
         ):
             self.async_write_ha_state()
         else:
@@ -574,11 +584,12 @@ class PositionCalibrationBlind(PositionBlind):
         """Update the running status."""
         if (
             self._calibration_type is MotionCalibrationType.UNCALIBRATED
-            and running_type in [MotionRunningType.OPENING, MotionRunningType.CLOSING]
+            and running_type
+            in [MotionRunningType.OPENING, MotionRunningType.CLOSING, None]
         ):
             # Curtain motor will calibrate if not calibrated and moved to some position
             _LOGGER.info(
-                f"({self.config_entry.data[CONF_MAC_CODE]}) Starting calibration"
+                f"({self.config_entry.data[CONF_MAC_CODE]}) Calibration status: calibrating"
             )
             self._calibration_type = MotionCalibrationType.CALIBRATING
             if callable(self._calibration_callback):
@@ -637,9 +648,7 @@ class PositionCalibrationBlind(PositionBlind):
     # Decorator
     async def run_command(self, func: Callable, *args, **kwargs) -> bool:
         """Run before every command that moves a blind, return whether or not to proceed with the command."""
-        # Do not throw an exception if the end positions are not set but a move command is given
-        kwargs["ignore_end_positions_not_set"] = True
-        return await super().run_command(func, *args, **kwargs)
+        return await super().run_command(func, True, *args, **kwargs)
 
 
 class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):

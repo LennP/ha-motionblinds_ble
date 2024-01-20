@@ -50,9 +50,9 @@ _LOGGER = logging.getLogger(__name__)
 def requires_end_positions(func: Callable) -> Callable:
     """Decorate a function making it require end positions."""
 
-    async def wrapper(self: MotionDevice, *args, **kwargs):
-        ignore_end_positions_not_set = kwargs.get("ignore_end_positions_not_set", False)
-
+    async def wrapper(
+        self: MotionDevice, *args, ignore_end_positions_not_set=False, **kwargs
+    ):
         if (
             self.end_position_info is not None
             and not self.end_position_info.up
@@ -64,7 +64,12 @@ def requires_end_positions(func: Callable) -> Callable:
             raise NoEndPositionsException(
                 EXCEPTION_NO_END_POSITIONS.format(device_name=self.device_name)
             )
-        return await func(self, *args, **kwargs)
+        return await func(
+            self,
+            *args,
+            ignore_end_positions_not_set=ignore_end_positions_not_set,
+            **kwargs,
+        )
 
     return wrapper
 
@@ -533,7 +538,7 @@ class MotionDevice:
 
     @requires_connection
     @requires_end_positions
-    async def stop(self) -> bool:
+    async def stop(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Stop moving the device."""
         command_prefix = str(MotionCommandType.STOP.value)
         return await self._send_command(command_prefix)
