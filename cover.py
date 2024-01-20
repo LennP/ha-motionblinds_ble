@@ -54,36 +54,25 @@ from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 _LOGGER = logging.getLogger(__name__)
 
 
-# Decorator methods that are used to perform checks before executing a command
-DECORATOR_METHOD_RUN_COMMAND = "run_command"
-DECORATOR_METHOD_NO_RUN_COMMAND = "no_run_command"
-
-
-def generic_command_decorator(method_name: str, func: Callable) -> Callable:
+def generic_command_decorator(
+    method: Callable[[GenericBlind], Callable], func: Callable
+) -> Callable:
     """Decorate a function by running a method before it."""
 
     async def wrapper(self, *args, **kwargs):
-        # Check if the object has an attribute named DECORATOR_FUNCTION
-        if hasattr(self, method_name):
-            decorator_func: Callable = getattr(self, method_name)
-            # Let the decorator method handle what happens before and after the method
-            res = await decorator_func(func, *args, **kwargs)
-        else:
-            # Call the function directly
-            res = await func(self, *args, **kwargs)
-        return res
+        return await method(self)(func, *args, **kwargs)
 
     return wrapper
 
 
 def run_command(func: Callable) -> Callable:
     """Decorate a method that moves the motor position."""
-    return generic_command_decorator(DECORATOR_METHOD_RUN_COMMAND, func)
+    return generic_command_decorator(lambda self: self.run_command_function, func)
 
 
 def no_run_command(func: Callable) -> Callable:
     """Decorate a method that does not move the motor position."""
-    return generic_command_decorator(DECORATOR_METHOD_NO_RUN_COMMAND, func)
+    return generic_command_decorator(lambda self: self.no_run_command_function, func)
 
 
 @dataclass
@@ -380,13 +369,13 @@ class GenericBlind(CoverEntity):
         """Return the state attributes."""
         return {ATTR_CONNECTION_TYPE: self._attr_connection_type}
 
-    async def before_command(self, *args, **kwargs) -> None:
+    async def before_command_function(self, *args, **kwargs) -> None:
         """Run some code before executing any command."""
         if self._attr_connection_type is MotionConnectionType.CONNECTED:
             self.async_refresh_disconnect_timer()
 
     # Decorator
-    async def run_command(
+    async def run_command_function(
         self,
         func: Callable,
         ignore_end_positions_not_set: bool = False,
@@ -394,7 +383,7 @@ class GenericBlind(CoverEntity):
         **kwargs,
     ) -> bool:
         """Run some code before executing any command that moves the position of the blind."""
-        await self.before_command(*args, **kwargs)
+        await self.before_command_function(*args, **kwargs)
         if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = False
         return await func(
@@ -405,9 +394,9 @@ class GenericBlind(CoverEntity):
         )
 
     # Decorator
-    async def no_run_command(self, func: Callable, *args, **kwargs) -> bool:
+    async def no_run_command_function(self, func: Callable, *args, **kwargs) -> bool:
         """Run some code before executing any command that does not move the position of the blind."""
-        await self.before_command(*args, **kwargs)
+        await self.before_command_function(*args, **kwargs)
         if self._attr_connection_type is not MotionConnectionType.CONNECTED:
             self._use_status_position_update_ui = True
             self.async_update_running(MotionRunningType.STILL)
@@ -646,9 +635,9 @@ class PositionCalibrationBlind(PositionBlind):
         return await super().async_connect(notification_delay=notification_delay)
 
     # Decorator
-    async def run_command(self, func: Callable, *args, **kwargs) -> bool:
+    async def run_command_function(self, func: Callable, *args, **kwargs) -> bool:
         """Run before every command that moves a blind, return whether or not to proceed with the command."""
-        return await super().run_command(func, True, *args, **kwargs)
+        return await super().run_command_function(func, True, *args, **kwargs)
 
 
 class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
@@ -657,7 +646,7 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
     _calibration_event: Event = Event()
 
     # Decorator
-    async def run_command(self, func: Callable, *args, **kwargs) -> bool:
+    async def run_command_function(self, func: Callable, *args, **kwargs) -> bool:
         """Run before every command that moves a blind, return whether or not to proceed with the command."""
         # Do not throw an exception if the end positions are not set but a move command is given
         if not self._device.is_connected():
@@ -671,7 +660,7 @@ class PositionTiltCalibrationBlind(PositionCalibrationBlind, PositionTiltBlind):
             raise NotCalibratedException(
                 EXCEPTION_NOT_CALIBRATED.format(device_name=self._attr_name)
             )
-        return await super().run_command(func, *args, **kwargs)
+        return await super().run_command_function(func, *args, **kwargs)
 
     @callback
     def async_update_calibration(self, end_position_info: MotionPositionInfo) -> None:
