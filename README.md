@@ -19,7 +19,7 @@ During the setup, you will be asked what kind of blind your MotionBlind is. Ther
 
 # Service
 
-You can use the [homeassistant.update_entity](https://www.home-assistant.io/docs/scripts/service-calls/#homeassistant-services) service on the cover entity to connect to your MotionBlind and update all of the entities their state.
+You can use the [homeassistant.update_entity](https://www.home-assistant.io/docs/scripts/service-calls/#homeassistant-services) service on a MotionBlinds BLE cover entity to connect to your MotionBlind and update the state of all entities belonging to it.
 
 # Troubleshooting
 
