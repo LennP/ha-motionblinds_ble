@@ -69,6 +69,7 @@ class MotionRunningType(StrEnum):
     OPENING = "opening"
     CLOSING = "closing"
     STILL = "still"
+    UNKNOWN = "unknown"
 
 
 class MotionSpeedLevel(IntEnum):

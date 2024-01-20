@@ -54,10 +54,10 @@ from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
 _LOGGER = logging.getLogger(__name__)
 
 
-def generic_command_decorator(
+def generic_method_decorator(
     method: Callable[[GenericBlind], Callable], func: Callable
 ) -> Callable:
-    """Decorate a function by running a method before it."""
+    """Decorate a method by running another method before it."""
 
     async def wrapper(self, *args, **kwargs):
         return await method(self)(func, *args, **kwargs)
@@ -67,12 +67,12 @@ def generic_command_decorator(
 
 def run_command(func: Callable) -> Callable:
     """Decorate a method that moves the motor position."""
-    return generic_command_decorator(lambda self: self.run_command_function, func)
+    return generic_method_decorator(lambda self: self.run_command_function, func)
 
 
 def no_run_command(func: Callable) -> Callable:
     """Decorate a method that does not move the motor position."""
-    return generic_command_decorator(lambda self: self.no_run_command_function, func)
+    return generic_method_decorator(lambda self: self.no_run_command_function, func)
 
 
 @dataclass
@@ -224,11 +224,11 @@ class GenericBlind(CoverEntity):
     @run_command
     async def async_favorite(self, **kwargs: Any) -> None:
         """Move the blind to the favorite position."""
-        self.async_update_running(None)
         _LOGGER.info(
             f"({self.config_entry.data[CONF_MAC_CODE]}) Going to favorite position"
         )
         await self._device.favorite()
+        self.async_update_running(MotionRunningType.UNKNOWN)
 
     @no_run_command
     async def async_speed(self, speed_level: MotionSpeedLevel, **kwargs: Any) -> None:
@@ -245,12 +245,14 @@ class GenericBlind(CoverEntity):
         self._running_type = running_type
         self._attr_is_opening = (
             False
-            if running_type is None or running_type is MotionRunningType.STILL
+            if running_type
+            in [None, MotionRunningType.STILL, MotionRunningType.UNKNOWN]
             else running_type is MotionRunningType.OPENING
         )
         self._attr_is_closing = (
             False
-            if running_type is None or running_type is MotionRunningType.STILL
+            if running_type
+            in [None, MotionRunningType.STILL, MotionRunningType.UNKNOWN]
             else running_type is not MotionRunningType.OPENING
         )
         if running_type is not MotionRunningType.STILL:
@@ -456,7 +458,7 @@ class PositionBlind(GenericBlind):
             f"({self.config_entry.data[CONF_MAC_CODE]}) Setting position to {new_position}"
         )
         self.async_update_running(
-            None
+            MotionRunningType.UNKNOWN
             if self._attr_current_cover_position is None or new_position is None
             else MotionRunningType.STILL
             if new_position == 100 - self._attr_current_cover_position
@@ -574,7 +576,11 @@ class PositionCalibrationBlind(PositionBlind):
         if (
             self._calibration_type is MotionCalibrationType.UNCALIBRATED
             and running_type
-            in [MotionRunningType.OPENING, MotionRunningType.CLOSING, None]
+            in [
+                MotionRunningType.OPENING,
+                MotionRunningType.CLOSING,
+                MotionRunningType.UNKNOWN,
+            ]
         ):
             # Curtain motor will calibrate if not calibrated and moved to some position
             _LOGGER.info(

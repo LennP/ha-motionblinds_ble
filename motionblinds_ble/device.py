@@ -78,11 +78,7 @@ def requires_favorite_position(func: Callable) -> Callable:
     """Decorate a function making it require a favorite position."""
 
     async def wrapper(self: MotionDevice, *args, **kwargs):
-        if (
-            self.end_position_info is not None
-            and not self.end_position_info.up
-            and not self.end_position_info.favorite
-        ):
+        if self.end_position_info is not None and not self.end_position_info.favorite:
             self.refresh_disconnect_timer()
             if callable(self.running_callback):
                 self.running_callback(MotionRunningType.STILL)
@@ -544,8 +540,9 @@ class MotionDevice:
         return await self._send_command(command_prefix)
 
     @requires_connection
+    @requires_end_positions
     @requires_favorite_position
-    async def favorite(self) -> bool:
+    async def favorite(self, ignore_end_positions_not_set: bool = False) -> bool:
         """Move the device to the favorite position."""
         command_prefix = str(MotionCommandType.FAVORITE.value)
         return await self._send_command(command_prefix)
