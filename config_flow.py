@@ -96,12 +96,6 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
     ) -> FlowResult:
         """Confirm a single device."""
         if user_input is not None:
-            if self._discovery_info is None:
-                return self.async_show_form(
-                    step_id="user",
-                    data_schema=CONFIG_SCHEMA,
-                    errors={"base": EXCEPTION_MAP[NoDevicesFound]},
-                )
             self._blind_type = user_input[CONF_BLIND_TYPE]
             return self.async_create_entry(
                 title=str(self._display_name),
@@ -165,20 +159,20 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
 
         existing_entries = self._async_current_entries()
 
-        if motion_device:
-            unique_id = motion_device.address
-            if any(entry.unique_id == unique_id for entry in existing_entries):
-                _LOGGER.error(
-                    f"Device with MAC code {mac_code} has already been configured"
-                )
-                raise AlreadyConfigured()
-            await self.async_set_unique_id(unique_id, raise_on_progress=False)
-            self._discovery_info = motion_device
-            self._mac_code = mac_code.upper()
-            self._display_name = f"MotionBlind {self._mac_code}"
-        else:
+        if not motion_device:
             _LOGGER.error(f"Could not find a motor with MAC code: {mac_code.upper()}")
             raise CouldNotFindMotor()
+
+        unique_id = motion_device.address
+        if any(entry.unique_id == unique_id for entry in existing_entries):
+            _LOGGER.error(
+                f"Device with MAC code {mac_code} has already been configured"
+            )
+            raise AlreadyConfigured()
+        await self.async_set_unique_id(unique_id, raise_on_progress=False)
+        self._discovery_info = motion_device
+        self._mac_code = mac_code.upper()
+        self._display_name = f"MotionBlind {self._mac_code}"
 
 
 def is_valid_mac(data: str) -> bool:
