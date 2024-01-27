@@ -27,7 +27,7 @@ from .const import (
     MotionCalibrationType,
 )
 from .cover import GenericBlind, PositionCalibrationBlind
-from .motionblinds_ble.const import MotionConnectionType
+from motionblindsble.const import MotionConnectionType
 
 _LOGGER = logging.getLogger(__name__)
 

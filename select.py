@@ -20,7 +20,7 @@ from .const import (
     SETTING_MAX_MOTOR_FEEDBACK_TIME,
 )
 from .cover import GenericBlind, PositionCalibrationBlind
-from .motionblinds_ble.const import MotionSpeedLevel
+from motionblindsble.const import MotionSpeedLevel
 
 _LOGGER = logging.getLogger(__name__)
 

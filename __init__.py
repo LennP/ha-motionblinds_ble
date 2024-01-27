@@ -10,7 +10,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.typing import ConfigType
 
 from .const import CONF_MAC_CODE, DOMAIN
-from .motionblinds_ble.crypt import MotionCrypt
+from motionblindsble.crypt import MotionCrypt
 
 _LOGGER = logging.getLogger(__name__)
 

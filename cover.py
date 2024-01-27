@@ -43,13 +43,13 @@ from .const import (
     MotionBlindType,
     MotionCalibrationType,
 )
-from .motionblinds_ble.const import (
+from motionblindsble.const import (
     SETTING_CALIBRATION_DISCONNECT_TIME,
     MotionConnectionType,
     MotionRunningType,
     MotionSpeedLevel,
 )
-from .motionblinds_ble.device import MotionDevice, MotionPositionInfo
+from motionblindsble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
 
