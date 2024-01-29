@@ -76,7 +76,7 @@ def no_run_command(func: Callable) -> Callable:
     return generic_method_decorator(lambda self: self.no_run_command_function, func)
 
 
-@dataclass
+@dataclass(frozen=True)
 class MotionCoverEntityDescription(CoverEntityDescription):
     """Entity description of a cover entity with default values."""
 
