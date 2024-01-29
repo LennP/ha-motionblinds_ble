@@ -5,6 +5,8 @@ from collections.abc import Callable
 from datetime import datetime
 import logging
 
+from motionblindsble.const import MotionSpeedLevel
+
 from homeassistant.components.select import SelectEntity, SelectEntityDescription
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
@@ -20,7 +22,6 @@ from .const import (
     SETTING_MAX_MOTOR_FEEDBACK_TIME,
 )
 from .cover import GenericBlind, PositionCalibrationBlind
-from motionblindsble.const import MotionSpeedLevel
 
 _LOGGER = logging.getLogger(__name__)
 

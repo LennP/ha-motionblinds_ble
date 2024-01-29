@@ -4,6 +4,8 @@ from __future__ import annotations
 import logging
 from math import ceil
 
+from motionblindsble.const import MotionConnectionType
+
 from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorEntity,
@@ -27,7 +29,6 @@ from .const import (
     MotionCalibrationType,
 )
 from .cover import GenericBlind, PositionCalibrationBlind
-from motionblindsble.const import MotionConnectionType
 
 _LOGGER = logging.getLogger(__name__)
 

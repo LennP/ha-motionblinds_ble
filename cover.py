@@ -8,6 +8,14 @@ from functools import partial
 import logging
 from typing import Any
 
+from motionblindsble.const import (
+    SETTING_CALIBRATION_DISCONNECT_TIME,
+    MotionConnectionType,
+    MotionRunningType,
+    MotionSpeedLevel,
+)
+from motionblindsble.device import MotionDevice, MotionPositionInfo
+
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
     BluetoothChange,
@@ -43,13 +51,6 @@ from .const import (
     MotionBlindType,
     MotionCalibrationType,
 )
-from motionblindsble.const import (
-    SETTING_CALIBRATION_DISCONNECT_TIME,
-    MotionConnectionType,
-    MotionRunningType,
-    MotionSpeedLevel,
-)
-from motionblindsble.device import MotionDevice, MotionPositionInfo
 
 _LOGGER = logging.getLogger(__name__)
 
