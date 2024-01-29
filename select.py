@@ -60,7 +60,8 @@ class SpeedSelect(SelectEntity):
     def __init__(self, blind: GenericBlind) -> None:
         """Initialize the speed select entity."""
         _LOGGER.info(
-            f"({blind.config_entry.data[CONF_MAC_CODE]}) Setting up speed select entity"
+            "(%s) Setting up speed select entity",
+            blind.config_entry.data[CONF_MAC_CODE],
         )
         self.entity_description = SELECT_TYPES[ATTR_SPEED]
         self._blind = blind
