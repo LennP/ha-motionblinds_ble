@@ -157,7 +157,7 @@ class ConnectionSensor(SensorEntity):
         self._blind = blind
         self._attr_unique_id = f"{blind.unique_id}_{ATTR_CONNECTION_TYPE}"
         self._attr_device_info = blind.device_info
-        self._attr_native_value = MotionConnectionType.DISCONNECTED
+        self._attr_native_value = MotionConnectionType.DISCONNECTED.value
 
     async def async_added_to_hass(self) -> None:
         """Run when entity about to be added."""
