@@ -97,6 +97,9 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         """Confirm a single device."""
         if user_input is not None:
             self._blind_type = user_input[CONF_BLIND_TYPE]
+
+            assert self._discovery_info is not None
+
             return self.async_create_entry(
                 title=str(self._display_name),
                 data={
