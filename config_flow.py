@@ -160,13 +160,13 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         existing_entries = self._async_current_entries()
 
         if not motion_device:
-            _LOGGER.error(f"Could not find a motor with MAC code: {mac_code.upper()}")
+            _LOGGER.error("Could not find a motor with MAC code: %s", mac_code.upper())
             raise CouldNotFindMotor()
 
         unique_id = motion_device.address
         if any(entry.unique_id == unique_id for entry in existing_entries):
             _LOGGER.error(
-                f"Device with MAC code {mac_code} has already been configured"
+                "Device with MAC code %s has already been configured", mac_code.upper()
             )
             raise AlreadyConfigured()
         await self.async_set_unique_id(unique_id, raise_on_progress=False)
