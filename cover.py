@@ -627,11 +627,12 @@ class PositionCalibrationBlind(PositionBlind):
             in [MotionRunningType.OPENING, MotionRunningType.CLOSING]
             else MotionCalibrationType.UNCALIBRATED
         )
-        _LOGGER.info(
-            "(%s) Calibration status: %s",
-            self.config_entry.data[CONF_MAC_CODE],
-            new_calibration_type,
-        )
+        if new_calibration_type != self._calibration_type:
+            _LOGGER.info(
+                "(%s) Calibration status: %s",
+                self.config_entry.data[CONF_MAC_CODE],
+                new_calibration_type,
+            )
 
         if (
             self._calibration_type is MotionCalibrationType.CALIBRATING
