@@ -128,7 +128,7 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
     async def async_discover_motionblind(self, mac_code: str) -> None:
         """Discover MotionBlinds initialized by the user."""
         if not is_valid_mac(mac_code):
-            _LOGGER.error(f"Invalid MAC code: {mac_code.upper()}")
+            _LOGGER.error("Invalid MAC code: %s", mac_code.upper())
             raise InvalidMACCode()
 
         count = bluetooth.async_scanner_count(self.hass, connectable=True)
