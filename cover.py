@@ -293,7 +293,9 @@ class GenericBlind(CoverEntity):
     def async_update_connection(self, connection_type: MotionConnectionType) -> None:
         """Update the connection status."""
         _LOGGER.info(
-            "(%s) %s", self.config_entry.data[CONF_MAC_CODE], connection_type.title()
+            "(%s) %s",
+            self.config_entry.data[CONF_MAC_CODE],
+            connection_type.value.title(),
         )
         self._attr_connection_type = connection_type
         if self._connection_callback is not None:
