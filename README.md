@@ -1,6 +1,8 @@
-# HA-MotionBlinds_BLE
+*The Motionblinds Bluetooth integration has been included as a [core integration](https://www.home-assistant.io/integrations/motionblinds_ble) as part of Home Assistant version 2024.4. Therefore, this custom component will be no longer actively maintained.*
 
-This Home Assistant integration adds support for **MotionBlinds** bluetooth motors. Beware that this integration does not work for **Eve MotionBlinds** motors. **Eve MotionBlinds** can be added to Home Assistant using the [HomeKit](https://www.home-assistant.io/integrations/homekit_controller/) integration.
+# Motionblinds Bluetooth
+
+This Home Assistant integration adds support for **MotionBlinds** Bluetooth motors. Beware that this integration does not work for **Eve MotionBlinds** motors. **Eve MotionBlinds** can be added to Home Assistant using the [HomeKit](https://www.home-assistant.io/integrations/homekit_controller/) integration.
 
 
 # Setup
@@ -11,9 +13,9 @@ During the setup, you will be asked what kind of blind your MotionBlind is. Ther
 - **Roller blind**: has the ability to change position and speed.
 - **Honeycomb blind**: has the ability to change position and speed.
 - **Roman blind**: has the ability to change position and speed.
-- **Venetian blind**: has the ability to change position, tilt and speed.
+- **Venetian blind**: has the ability to change position, tilt, and speed.
 - **Venetian blind (tilt-only)**: has the ability to change tilt and speed.
-- **Double Roller blind**: has the ability to change position, tilt and speed.
+- **Double Roller blind**: has the ability to change position, tilt, and speed.
 - **Curtain blind**: has the ability to change position. May need to be calibrated if the end positions are lost, which can be done by using the open/close cover button or the set cover position slider. This will trigger a calibration which will first make the curtain find the end positions after which it will run to the position as indicated by the command that was given.
 - **Vertical blind**: has the ability to change position and tilt. May need to be calibrated if the end positions are lost, which has to be done using the MotionBlinds BLE app.
 
