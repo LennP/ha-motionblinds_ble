@@ -1,4 +1,6 @@
-*The Motionblinds Bluetooth integration has been included as a [core integration](https://www.home-assistant.io/integrations/motionblinds_ble) as part of Home Assistant version 2024.4. Therefore, this custom component will be no longer actively maintained.*
+> [!NOTE]
+> **The Motionblinds Bluetooth integration has been included as a [core integration](https://www.home-assistant.io/integrations/motionblinds_ble) as part of Home Assistant version 2024.4. Therefore, this custom component will no longer be actively maintained.**
+
 
 # Motionblinds Bluetooth
 
