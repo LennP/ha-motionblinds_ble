@@ -1,4 +1,5 @@
 """Button entities for the MotionBlinds BLE integration."""
+
 from __future__ import annotations
 
 from collections.abc import Callable, Coroutine
@@ -6,114 +7,84 @@ from dataclasses import dataclass
 import logging
 from typing import Any
 
+from motionblindsble.device import MotionDevice
+
 from homeassistant.components.button import ButtonEntity, ButtonEntityDescription
-from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import EntityCategory
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 
-from .const import (
-    ATTR_CONNECT,
-    ATTR_DISCONNECT,
-    ATTR_FAVORITE,
-    CONF_MAC_CODE,
-    DOMAIN,
-    ICON_CONNECT,
-    ICON_DISCONNECT,
-    ICON_FAVORITE,
-)
-from .cover import GenericBlind
+from . import MotionConfigEntry
+from .const import ATTR_CONNECT, ATTR_DISCONNECT, ATTR_FAVORITE, CONF_MAC_CODE
+from .entity import MotionblindsBLEEntity
 
 _LOGGER = logging.getLogger(__name__)
 
 PARALLEL_UPDATES = 0
 
 
-@dataclass(frozen=True)
-class CommandButtonEntityDescription(ButtonEntityDescription):
-    """Entity description of a button entity that executes a command upon being pressed."""
+@dataclass(frozen=True, kw_only=True)
+class MotionblindsBLEButtonEntityDescription(ButtonEntityDescription):
+    """Entity description of a button entity with command attribute."""
 
-    command_callback: Callable[[GenericBlind], Coroutine[Any, Any, None]] | None = None
-
-
-async def command_connect(blind: GenericBlind) -> None:
-    """Connect when the connect button is pressed."""
-    await blind.async_connect()
+    command: Callable[[MotionDevice], Coroutine[Any, Any, None]]
 
 
-async def command_disconnect(blind: GenericBlind) -> None:
-    """Disconnect when the disconnect button is pressed."""
-    await blind.async_disconnect()
-
-
-async def command_favorite(blind: GenericBlind) -> None:
-    """Go to the favorite position when the favorite button is pressed."""
-    await blind.async_favorite()
-
-
-BUTTON_TYPES: dict[str, CommandButtonEntityDescription] = {
-    ATTR_CONNECT: CommandButtonEntityDescription(
+BUTTON_TYPES: list[MotionblindsBLEButtonEntityDescription] = [
+    MotionblindsBLEButtonEntityDescription(
         key=ATTR_CONNECT,
         translation_key=ATTR_CONNECT,
-        icon=ICON_CONNECT,
         entity_category=EntityCategory.CONFIG,
-        has_entity_name=True,
-        command_callback=command_connect,
+        command=lambda device: device.connect(),
     ),
-    ATTR_DISCONNECT: CommandButtonEntityDescription(
+    MotionblindsBLEButtonEntityDescription(
         key=ATTR_DISCONNECT,
         translation_key=ATTR_DISCONNECT,
-        icon=ICON_DISCONNECT,
         entity_category=EntityCategory.CONFIG,
-        has_entity_name=True,
-        command_callback=command_disconnect,
+        command=lambda device: device.disconnect(),
     ),
-    ATTR_FAVORITE: CommandButtonEntityDescription(
+    MotionblindsBLEButtonEntityDescription(
         key=ATTR_FAVORITE,
         translation_key=ATTR_FAVORITE,
-        icon=ICON_FAVORITE,
         entity_category=EntityCategory.CONFIG,
-        has_entity_name=True,
-        command_callback=command_favorite,
+        command=lambda device: device.favorite(),
     ),
-}
+]
 
 
 async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
+    hass: HomeAssistant,
+    entry: MotionConfigEntry,
+    async_add_entities: AddEntitiesCallback,
 ) -> None:
-    """Set up buttons based on a config entry."""
+    """Set up button entities based on a config entry."""
 
-    blind: GenericBlind = hass.data[DOMAIN][entry.entry_id]
+    device = entry.runtime_data
 
     async_add_entities(
-        [
-            GenericCommandButton(blind, entity_description)
-            for entity_description in BUTTON_TYPES.values()
-        ]
+        MotionblindsBLEButtonEntity(
+            device,
+            entry,
+            entity_description,
+            unique_id_suffix=entity_description.key,
+        )
+        for entity_description in BUTTON_TYPES
     )
 
 
-class GenericCommandButton(ButtonEntity):
-    """Representation of a command button."""
+class MotionblindsBLEButtonEntity(MotionblindsBLEEntity, ButtonEntity):
+    """Representation of a button entity."""
 
-    entity_description: CommandButtonEntityDescription
+    entity_description: MotionblindsBLEButtonEntityDescription
 
-    def __init__(
-        self, blind: GenericBlind, entity_description: CommandButtonEntityDescription
-    ) -> None:
-        """Initialize the command button."""
-        _LOGGER.info(
+    async def async_added_to_hass(self) -> None:
+        """Log button entity information."""
+        _LOGGER.debug(
             "(%s) Setting up %s button entity",
-            blind.config_entry.data[CONF_MAC_CODE],
-            entity_description.key,
+            self.entry.data[CONF_MAC_CODE],
+            self.entity_description.key,
         )
-        self.entity_description = entity_description
-        self._blind = blind
-        self._attr_unique_id = f"{blind.unique_id}_{entity_description.key}"
-        self._attr_device_info = blind.device_info
 
     async def async_press(self) -> None:
         """Handle the button press."""
-        if callable(self.entity_description.command_callback):
-            await self.entity_description.command_callback(self._blind)
+        await self.entity_description.command(self.device)

@@ -1,11 +1,12 @@
 {
     "config": {
+        "abort": {
+            "no_bluetooth_adapter": "No Bluetooth adapter found",
+            "no_devices_found": "Could not find any Bluetooth devices"
+        },
         "error": {
-            "already_configured": "Device is already configured",
             "could_not_find_motor": "Could not find a motor with that MAC code",
-            "invalid_mac_code": "Invalid MAC code",
-            "no_bluetooth_adapter": "No bluetooth adapter found",
-            "no_devices_found": "Could not find any bluetooth devices"
+            "invalid_mac_code": "Invalid MAC code"
         },
         "step": {
             "confirm": {
@@ -31,24 +32,9 @@
                 "name": "Favorite"
             }
         },
-        "cover": {
-            "blind": {
-                "state_attributes": {
-                    "connection_type": {
-                        "name": "Connected",
-                        "state": {
-                            "connected": "Yes",
-                            "connecting": "Connecting...",
-                            "disconnected": "No",
-                            "disconnecting": "Disconnecting..."
-                        }
-                    }
-                }
-            }
-        },
         "select": {
             "speed": {
-                "name": "Motor speed",
+                "name": "Speed",
                 "state": {
                     "1": "Low",
                     "2": "Medium",
@@ -57,28 +43,34 @@
             }
         },
         "sensor": {
-            "battery": {
-                "name": "Battery"
-            },
             "calibration": {
-                "name": "Calibrated",
+                "name": "Calibration status",
                 "state": {
-                    "calibrated": "Yes",
-                    "calibrating": "Calibrating...",
-                    "uncalibrated": "No"
+                    "calibrated": "Calibrated",
+                    "calibrating": "Calibration in progress",
+                    "uncalibrated": "Uncalibrated"
                 }
             },
-            "connection_type": {
-                "name": "Connected",
+            "connection": {
+                "name": "Connection status",
                 "state": {
-                    "connected": "Yes",
-                    "connecting": "Connecting...",
-                    "disconnected": "No",
-                    "disconnecting": "Disconnecting..."
+                    "connected": "Connected",
+                    "connecting": "Connecting",
+                    "disconnected": "Disconnected",
+                    "disconnecting": "Disconnecting"
                 }
-            },
-            "signal_strength": {
-                "name": "Signal strength"
+            }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "disconnect_time": "Disconnect time (seconds)",
+                    "permanent_connection": "Permanent connection"
+                },
+                "description": "The default disconnect time is 15 seconds, adjustable using the slider below. You may want to adjust this if you have larger blinds or other specific needs. You can also enable a permanent connection to the motor, which disables the disconnect time and automatically reconnects when the motor is disconnected for any reason.\n**WARNING**: Changing any of the below options may significantly reduce battery life of your motor!",
+                "title": "Connection options"
             }
         }
     },
@@ -86,7 +78,7 @@
         "blind_type": {
             "options": {
                 "curtain": "Curtain blind",
-                "double_roller": "Double Roller blind",
+                "double_roller": "Double roller blind",
                 "honeycomb": "Honeycomb blind",
                 "roller": "Roller blind",
                 "roman": "Roman blind",

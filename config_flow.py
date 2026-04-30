@@ -1,17 +1,20 @@
 """Config flow for MotionBlinds BLE integration."""
+
 from __future__ import annotations
 
 import logging
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from bleak.backends.device import BLEDevice
+from motionblindsble.const import DISPLAY_NAME, SETTING_DISCONNECT_TIME, MotionBlindType
 import voluptuous as vol
 
 from homeassistant.components import bluetooth
 from homeassistant.components.bluetooth import BluetoothServiceInfoBleak
-from homeassistant.config_entries import ConfigFlow
-from homeassistant.data_entry_flow import FlowResult
+from homeassistant.config_entries import ConfigFlow, ConfigFlowResult, OptionsFlow
+from homeassistant.const import CONF_ADDRESS
+from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
 from homeassistant.helpers.selector import (
     SelectSelector,
@@ -19,18 +22,18 @@ from homeassistant.helpers.selector import (
     SelectSelectorMode,
 )
 
+from . import MotionConfigEntry
 from .const import (
-    CONF_ADDRESS,
     CONF_BLIND_TYPE,
     CONF_LOCAL_NAME,
     CONF_MAC_CODE,
     DOMAIN,
-    ERROR_ALREADY_CONFIGURED,
     ERROR_COULD_NOT_FIND_MOTOR,
     ERROR_INVALID_MAC_CODE,
     ERROR_NO_BLUETOOTH_ADAPTER,
     ERROR_NO_DEVICES_FOUND,
-    MotionBlindType,
+    OPTION_DISCONNECT_TIME,
+    OPTION_PERMANENT_CONNECTION,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,16 +44,17 @@ CONFIG_SCHEMA = vol.Schema({vol.Required(CONF_MAC_CODE): str})
 class FlowHandler(ConfigFlow, domain=DOMAIN):
     """Handle a config flow for MotionBlinds BLE."""
 
-    VERSION = 1
+    _display_name: str
 
-    _discovery_info: BluetoothServiceInfoBleak | BLEDevice | None = None
-    _mac_code: str | None = None
-    _display_name: str | None = None
-    _blind_type: MotionBlindType | None = None
+    def __init__(self) -> None:
+        """Initialize a ConfigFlow."""
+        self._discovery_info: BluetoothServiceInfoBleak | BLEDevice | None = None
+        self._mac_code: str | None = None
+        self._blind_type: MotionBlindType | None = None
 
     async def async_step_bluetooth(
         self, discovery_info: BluetoothServiceInfoBleak
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle the bluetooth discovery step."""
         _LOGGER.debug(
             "Discovered MotionBlinds bluetooth device: %s", discovery_info.as_dict()
@@ -60,32 +64,35 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
 
         self._discovery_info = discovery_info
         self._mac_code = get_mac_from_local_name(discovery_info.name)
-        self._display_name = f"MotionBlind {self._mac_code}"
-        self.context["local_name"] = discovery_info.name
+        self._display_name = DISPLAY_NAME.format(mac_code=self._mac_code)
         self.context["title_placeholders"] = {"name": self._display_name}
 
         return await self.async_step_confirm()
 
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Handle a flow initialized by the user."""
         errors: dict[str, str] = {}
         if user_input is not None:
             mac_code = user_input[CONF_MAC_CODE]
-            # Discover with BLE
             try:
                 await self.async_discover_motionblind(mac_code)
+            except NoBluetoothAdapter:
+                return self.async_abort(reason=EXCEPTION_MAP[NoBluetoothAdapter])
+            except NoDevicesFound:
+                return self.async_abort(reason=EXCEPTION_MAP[NoDevicesFound])
             except tuple(EXCEPTION_MAP.keys()) as e:
-                errors = {
-                    "base": EXCEPTION_MAP[type(e)]
-                    if type(e) in EXCEPTION_MAP
-                    else str(type(e))
-                }
+                errors = {"base": EXCEPTION_MAP.get(type(e), str(type(e)))}
                 return self.async_show_form(
                     step_id="user", data_schema=CONFIG_SCHEMA, errors=errors
                 )
             return await self.async_step_confirm()
+
+        scanner_count = bluetooth.async_scanner_count(self.hass, connectable=True)
+        if not scanner_count:
+            _LOGGER.error("No bluetooth adapter found")
+            return self.async_abort(reason=EXCEPTION_MAP[NoBluetoothAdapter])
 
         return self.async_show_form(
             step_id="user", data_schema=CONFIG_SCHEMA, errors=errors
@@ -93,15 +100,16 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
 
     async def async_step_confirm(
         self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    ) -> ConfigFlowResult:
         """Confirm a single device."""
         if user_input is not None:
             self._blind_type = user_input[CONF_BLIND_TYPE]
 
-            assert self._discovery_info is not None
+            if TYPE_CHECKING:
+                assert self._discovery_info is not None
 
             return self.async_create_entry(
-                title=str(self._display_name),
+                title=self._display_name,
                 data={
                     CONF_ADDRESS: self._discovery_info.address,
                     CONF_LOCAL_NAME: self._discovery_info.name,
@@ -117,7 +125,8 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
                     vol.Required(CONF_BLIND_TYPE): SelectSelector(
                         SelectSelectorConfig(
                             options=[
-                                blind_type.value for blind_type in MotionBlindType
+                                blind_type.name.lower()
+                                for blind_type in MotionBlindType
                             ],
                             translation_key=CONF_BLIND_TYPE,
                             mode=SelectSelectorMode.DROPDOWN,
@@ -132,22 +141,19 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
         """Discover MotionBlinds initialized by the user."""
         if not is_valid_mac(mac_code):
             _LOGGER.error("Invalid MAC code: %s", mac_code.upper())
-            raise InvalidMACCode()
+            raise InvalidMACCode
 
-        count = bluetooth.async_scanner_count(self.hass, connectable=True)
-        if count == 0:
-            self.hass.async_create_task(
-                self.hass.config_entries.flow.async_configure(flow_id=self.flow_id)
-            )
+        scanner_count = bluetooth.async_scanner_count(self.hass, connectable=True)
+        if not scanner_count:
             _LOGGER.error("No bluetooth adapter found")
-            raise NoBluetoothAdapter()
+            raise NoBluetoothAdapter
 
         bleak_scanner = bluetooth.async_get_scanner(self.hass)
         devices = await bleak_scanner.discover()
 
         if len(devices) == 0:
             _LOGGER.error("Could not find any bluetooth devices")
-            raise NoDevicesFound()
+            raise NoDevicesFound
 
         motion_device: BLEDevice | None = next(
             (
@@ -160,22 +166,55 @@ class FlowHandler(ConfigFlow, domain=DOMAIN):
             None,
         )
 
-        existing_entries = self._async_current_entries()
-
-        if not motion_device:
+        if motion_device is None:
             _LOGGER.error("Could not find a motor with MAC code: %s", mac_code.upper())
-            raise CouldNotFindMotor()
+            raise CouldNotFindMotor
 
-        unique_id = motion_device.address
-        if any(entry.unique_id == unique_id for entry in existing_entries):
-            _LOGGER.error(
-                "Device with MAC code %s has already been configured", mac_code.upper()
-            )
-            raise AlreadyConfigured()
-        await self.async_set_unique_id(unique_id, raise_on_progress=False)
+        await self.async_set_unique_id(motion_device.address, raise_on_progress=False)
+        self._abort_if_unique_id_configured()
+
         self._discovery_info = motion_device
         self._mac_code = mac_code.upper()
-        self._display_name = f"MotionBlind {self._mac_code}"
+        self._display_name = DISPLAY_NAME.format(mac_code=self._mac_code)
+
+    @staticmethod
+    @callback
+    def async_get_options_flow(
+        config_entry: MotionConfigEntry,
+    ) -> OptionsFlow:
+        """Create the options flow."""
+        return OptionsFlowHandler()
+
+
+class OptionsFlowHandler(OptionsFlow):
+    """Handle an options flow for MotionBlinds BLE."""
+
+    async def async_step_init(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Manage the options."""
+        if user_input is not None:
+            return self.async_create_entry(title="", data=user_input)
+
+        return self.async_show_form(
+            step_id="init",
+            data_schema=vol.Schema(
+                {
+                    vol.Required(
+                        OPTION_PERMANENT_CONNECTION,
+                        default=self.config_entry.options.get(
+                            OPTION_PERMANENT_CONNECTION, False
+                        ),
+                    ): bool,
+                    vol.Optional(
+                        OPTION_DISCONNECT_TIME,
+                        default=self.config_entry.options.get(
+                            OPTION_DISCONNECT_TIME, SETTING_DISCONNECT_TIME
+                        ),
+                    ): vol.All(vol.Coerce(int), vol.Range(min=0)),
+                }
+            ),
+        )
 
 
 def is_valid_mac(data: str) -> bool:
@@ -197,10 +236,6 @@ class CouldNotFindMotor(HomeAssistantError):
     """Error to indicate no motor with that MAC code could be found."""
 
 
-class AlreadyConfigured(HomeAssistantError):
-    """Error to indicate the device has already been configured."""
-
-
 class InvalidMACCode(HomeAssistantError):
     """Error to indicate the MAC code is invalid."""
 
@@ -217,6 +252,5 @@ EXCEPTION_MAP = {
     NoBluetoothAdapter: ERROR_NO_BLUETOOTH_ADAPTER,
     NoDevicesFound: ERROR_NO_DEVICES_FOUND,
     CouldNotFindMotor: ERROR_COULD_NOT_FIND_MOTOR,
-    AlreadyConfigured: ERROR_ALREADY_CONFIGURED,
     InvalidMACCode: ERROR_INVALID_MAC_CODE,
 }
