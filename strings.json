@@ -59,6 +59,12 @@
           "disconnected": "Disconnected",
           "disconnecting": "Disconnecting"
         }
+      },
+      "temperature": {
+        "name": "Temperature"
+      },
+      "illuminance": {
+        "name": "Illuminance"
       }
     }
   },

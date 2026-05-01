@@ -21,8 +21,10 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import (
+    LIGHT_LUX,
     PERCENTAGE,
     SIGNAL_STRENGTH_DECIBELS_MILLIWATT,
+    UnitOfTemperature,
     EntityCategory,
 )
 from homeassistant.core import HomeAssistant, callback
@@ -34,7 +36,9 @@ from .const import (
     ATTR_BATTERY,
     ATTR_CALIBRATION,
     ATTR_CONNECTION,
+    ATTR_ILLUMINANCE,
     ATTR_SIGNAL_STRENGTH,
+    ATTR_TEMPERATURE,
     CONF_MAC_CODE,
 )
 from .entity import MotionblindsBLEEntity
@@ -87,6 +91,24 @@ SENSORS: tuple[MotionblindsBLESensorEntityDescription, ...] = (
         register_callback_func=lambda device: device.register_signal_strength_callback,
         value_func=lambda value: value,
         entity_registry_enabled_default=False,
+    ),
+    MotionblindsBLESensorEntityDescription[int](
+        key=ATTR_TEMPERATURE,
+        translation_key=ATTR_TEMPERATURE,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        register_callback_func=lambda device: device.register_temperature_callback,
+        value_func=lambda value: value,
+    ),
+    MotionblindsBLESensorEntityDescription[int](
+        key=ATTR_ILLUMINANCE,
+        translation_key=ATTR_ILLUMINANCE,
+        device_class=SensorDeviceClass.ILLUMINANCE,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=LIGHT_LUX,
+        register_callback_func=lambda device: device.register_illuminance_callback,
+        value_func=lambda value: value,
     ),
 )
 

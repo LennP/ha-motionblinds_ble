@@ -7,7 +7,8 @@ import logging
 
 from motionblindsble.const import MotionBlindType
 from motionblindsble.crypt import MotionCrypt
-from motionblindsble.device import MotionDevice
+
+from .device import ExtendedMotionDevice as MotionDevice
 
 from homeassistant.components.bluetooth import (
     BluetoothCallbackMatcher,
