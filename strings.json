@@ -22,24 +22,39 @@
   },
   "entity": {
     "button": {
-      "connect": {
-        "name": "Connect"
-      },
-      "disconnect": {
-        "name": "Disconnect"
-      },
-      "favorite": {
-        "name": "Favorite"
-      }
+      "connect": { "name": "Connect" },
+      "disconnect": { "name": "Disconnect" },
+      "favorite": { "name": "Favorite" },
+      "point_up": { "name": "Point up" },
+      "point_down": { "name": "Point down" },
+      "calibration_begin": { "name": "Begin calibration" },
+      "calibration_end": { "name": "End calibration" },
+      "set_endpoint_up": { "name": "Set top endpoint" },
+      "set_endpoint_down": { "name": "Set bottom endpoint" },
+      "set_endpoint_third": { "name": "Set third endpoint" },
+      "set_angle_begin": { "name": "Begin angle setup" },
+      "set_angle_zero": { "name": "Set angle 0°" },
+      "set_angle_ninety": { "name": "Set angle 90°" },
+      "set_angle_one_eighty": { "name": "Set angle 180°" },
+      "tilt_reverse": { "name": "Reverse tilt" },
+      "auto_position": { "name": "Auto position" },
+      "set_direction": { "name": "Set direction" },
+      "back_top_open": { "name": "Open top (back)" },
+      "back_top_close": { "name": "Close top (back)" },
+      "back_bottom_open": { "name": "Open bottom (back)" },
+      "back_bottom_close": { "name": "Close bottom (back)" }
+    },
+    "number": {
+      "brightness": { "name": "Brightness" }
     },
     "select": {
       "speed": {
         "name": "Speed",
-        "state": {
-          "1": "Low",
-          "2": "Medium",
-          "3": "High"
-        }
+        "state": { "1": "Low", "2": "Medium", "3": "High" }
+      },
+      "device_type": {
+        "name": "Device type",
+        "state": { "E": "E", "ED": "ED" }
       }
     },
     "sensor": {
@@ -60,12 +75,26 @@
           "disconnecting": "Disconnecting"
         }
       },
-      "temperature": {
-        "name": "Temperature"
+      "temperature": { "name": "Temperature" },
+      "illuminance": { "name": "Illuminance" },
+      "brightness": { "name": "Brightness setpoint" },
+      "direction": {
+        "name": "Direction",
+        "state": { "normal": "Normal", "reversed": "Reversed" }
       },
-      "illuminance": {
-        "name": "Illuminance"
-      }
+      "point_type": {
+        "name": "Point type",
+        "state": { "E": "E", "ED": "ED" }
+      },
+      "endpoints": { "name": "Endpoints set" },
+      "sensor_status": { "name": "Sensor status" }
+    },
+    "switch": {
+      "light": { "name": "Light" },
+      "rain_sensor": { "name": "Rain sensor" },
+      "wind_sensor": { "name": "Wind sensor" },
+      "combo_sensor": { "name": "Wind+light+rain sensor" },
+      "slow_stop": { "name": "Slow stop" }
     }
   },
   "options": {

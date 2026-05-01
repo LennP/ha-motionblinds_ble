@@ -38,8 +38,10 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS: list[Platform] = [
     Platform.BUTTON,
     Platform.COVER,
+    Platform.NUMBER,
     Platform.SELECT,
     Platform.SENSOR,
+    Platform.SWITCH,
 ]
 
 CONFIG_SCHEMA = cv.empty_config_schema(DOMAIN)

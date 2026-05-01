@@ -34,13 +34,19 @@ from homeassistant.helpers.typing import StateType
 from . import MotionConfigEntry
 from .const import (
     ATTR_BATTERY,
+    ATTR_BRIGHTNESS,
     ATTR_CALIBRATION,
     ATTR_CONNECTION,
+    ATTR_DIRECTION,
+    ATTR_ENDPOINTS,
     ATTR_ILLUMINANCE,
+    ATTR_POINT_TYPE,
+    ATTR_SENSOR_STATUS,
     ATTR_SIGNAL_STRENGTH,
     ATTR_TEMPERATURE,
     CONF_MAC_CODE,
 )
+from .device import EndpointInfo, SensorStatus
 from .entity import MotionblindsBLEEntity
 
 _LOGGER = logging.getLogger(__name__)
@@ -109,6 +115,66 @@ SENSORS: tuple[MotionblindsBLESensorEntityDescription, ...] = (
         native_unit_of_measurement=LIGHT_LUX,
         register_callback_func=lambda device: device.register_illuminance_callback,
         value_func=lambda value: value,
+    ),
+    MotionblindsBLESensorEntityDescription[int](
+        key=ATTR_BRIGHTNESS,
+        translation_key=ATTR_BRIGHTNESS,
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=PERCENTAGE,
+        register_callback_func=lambda device: device.register_brightness_callback,
+        value_func=lambda value: value,
+        entity_registry_enabled_default=False,
+    ),
+    MotionblindsBLESensorEntityDescription[bool](
+        key=ATTR_DIRECTION,
+        translation_key=ATTR_DIRECTION,
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        options=["normal", "reversed"],
+        register_callback_func=lambda device: device.register_direction_callback,
+        value_func=lambda value: (
+            None if value is None else ("reversed" if value else "normal")
+        ),
+        entity_registry_enabled_default=False,
+    ),
+    MotionblindsBLESensorEntityDescription[str](
+        key=ATTR_POINT_TYPE,
+        translation_key=ATTR_POINT_TYPE,
+        device_class=SensorDeviceClass.ENUM,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        options=["E", "ED"],
+        register_callback_func=lambda device: device.register_point_type_callback,
+        value_func=lambda value: value,
+        entity_registry_enabled_default=False,
+    ),
+    MotionblindsBLESensorEntityDescription[EndpointInfo](
+        key=ATTR_ENDPOINTS,
+        translation_key=ATTR_ENDPOINTS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        register_callback_func=lambda device: device.register_endpoint_callback,
+        value_func=lambda value: (
+            None
+            if value is None
+            else "+".join(
+                flag
+                for flag, present in (
+                    ("up", value.up),
+                    ("down", value.down),
+                    ("favorite", value.favorite),
+                )
+                if present
+            )
+            or "none"
+        ),
+        entity_registry_enabled_default=False,
+    ),
+    MotionblindsBLESensorEntityDescription[SensorStatus](
+        key=ATTR_SENSOR_STATUS,
+        translation_key=ATTR_SENSOR_STATUS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        register_callback_func=lambda device: device.register_sensor_status_callback,
+        value_func=lambda value: (None if value is None else f"0x{value.raw:02x}"),
+        entity_registry_enabled_default=False,
     ),
 )
 
