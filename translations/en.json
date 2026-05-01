@@ -1,84 +1,109 @@
 {
     "config": {
+        "abort": {
+            "no_bluetooth_adapter": "No Bluetooth adapter found",
+            "no_devices_found": "Could not find any Bluetooth devices"
+        },
         "error": {
-            "already_configured": "Device is already configured",
             "could_not_find_motor": "Could not find a motor with that MAC code",
-            "invalid_mac_code": "Invalid MAC code",
-            "no_bluetooth_adapter": "No bluetooth adapter found",
-            "no_devices_found": "Could not find any bluetooth devices"
+            "invalid_mac_code": "Invalid MAC code"
         },
         "step": {
             "confirm": {
                 "description": "What kind of blind is {display_name}?"
             },
             "user": {
-                "data": {
-                    "mac_code": "MAC code"
-                },
+                "data": { "mac_code": "MAC code" },
                 "description": "Fill in the 4-character MAC code of your motor, for example F3ED or E3A6"
             }
         }
     },
     "entity": {
         "button": {
-            "connect": {
-                "name": "Connect"
-            },
-            "disconnect": {
-                "name": "Disconnect"
-            },
-            "favorite": {
-                "name": "Favorite"
-            }
+            "connect": { "name": "Connect" },
+            "disconnect": { "name": "Disconnect" },
+            "favorite": { "name": "Favorite" },
+            "point_up": { "name": "Point up" },
+            "point_down": { "name": "Point down" },
+            "calibration_begin": { "name": "Begin calibration" },
+            "calibration_end": { "name": "End calibration" },
+            "set_endpoint_up": { "name": "Set top endpoint" },
+            "set_endpoint_down": { "name": "Set bottom endpoint" },
+            "set_endpoint_third": { "name": "Set third endpoint" },
+            "set_angle_begin": { "name": "Begin angle setup" },
+            "set_angle_zero": { "name": "Set angle 0°" },
+            "set_angle_ninety": { "name": "Set angle 90°" },
+            "set_angle_one_eighty": { "name": "Set angle 180°" },
+            "tilt_reverse": { "name": "Reverse tilt" },
+            "auto_position": { "name": "Auto position" },
+            "set_direction": { "name": "Set direction" },
+            "back_top_open": { "name": "Open top (back)" },
+            "back_top_close": { "name": "Close top (back)" },
+            "back_bottom_open": { "name": "Open bottom (back)" },
+            "back_bottom_close": { "name": "Close bottom (back)" }
         },
-        "cover": {
-            "blind": {
-                "state_attributes": {
-                    "connection_type": {
-                        "name": "Connected",
-                        "state": {
-                            "connected": "Yes",
-                            "connecting": "Connecting...",
-                            "disconnected": "No",
-                            "disconnecting": "Disconnecting..."
-                        }
-                    }
-                }
-            }
+        "number": {
+            "brightness": { "name": "Brightness" }
         },
         "select": {
             "speed": {
-                "name": "Motor speed",
-                "state": {
-                    "1": "Low",
-                    "2": "Medium",
-                    "3": "High"
-                }
+                "name": "Speed",
+                "state": { "1": "Low", "2": "Medium", "3": "High" }
+            },
+            "device_type": {
+                "name": "Device type",
+                "state": { "E": "E", "ED": "ED" }
             }
         },
         "sensor": {
-            "battery": {
-                "name": "Battery"
-            },
             "calibration": {
-                "name": "Calibrated",
+                "name": "Calibration status",
                 "state": {
-                    "calibrated": "Yes",
-                    "calibrating": "Calibrating...",
-                    "uncalibrated": "No"
+                    "calibrated": "Calibrated",
+                    "calibrating": "Calibration in progress",
+                    "uncalibrated": "Uncalibrated"
                 }
             },
-            "connection_type": {
-                "name": "Connected",
+            "connection": {
+                "name": "Connection status",
                 "state": {
-                    "connected": "Yes",
-                    "connecting": "Connecting...",
-                    "disconnected": "No",
-                    "disconnecting": "Disconnecting..."
+                    "connected": "Connected",
+                    "connecting": "Connecting",
+                    "disconnected": "Disconnected",
+                    "disconnecting": "Disconnecting"
                 }
             },
-            "signal_strength": {
-                "name": "Signal strength"
+            "temperature": { "name": "Temperature" },
+            "illuminance": { "name": "Illuminance" },
+            "brightness": { "name": "Brightness setpoint" },
+            "direction": {
+                "name": "Direction",
+                "state": { "normal": "Normal", "reversed": "Reversed" }
+            },
+            "point_type": {
+                "name": "Point type",
+                "state": { "E": "E", "ED": "ED" }
+            },
+            "endpoints": { "name": "Endpoints set" },
+            "sensor_status": { "name": "Sensor status" }
+        },
+        "switch": {
+            "light": { "name": "Light" },
+            "rain_sensor": { "name": "Rain sensor" },
+            "wind_sensor": { "name": "Wind sensor" },
+            "combo_sensor": { "name": "Wind+light+rain sensor" },
+            "slow_stop": { "name": "Slow stop" }
+        }
+    },
+    "options": {
+        "step": {
+            "init": {
+                "data": {
+                    "disconnect_time": "Disconnect time (seconds)",
+                    "permanent_connection": "Permanent connection"
+                },
+                "description": "The default disconnect time is 15 seconds, adjustable using the slider below. You may want to adjust this if you have larger blinds or other specific needs. You can also enable a permanent connection to the motor, which disables the disconnect time and automatically reconnects when the motor is disconnected for any reason.\n**WARNING**: Changing any of the below options may significantly reduce battery life of your motor!",
+                "title": "Connection options"
             }
         }
     },
@@ -86,7 +111,7 @@
         "blind_type": {
             "options": {
                 "curtain": "Curtain blind",
-                "double_roller": "Double Roller blind",
+                "double_roller": "Double roller blind",
                 "honeycomb": "Honeycomb blind",
                 "roller": "Roller blind",
                 "roman": "Roman blind",

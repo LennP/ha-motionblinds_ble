@@ -1,0 +1,49 @@
+{
+  "entity": {
+    "button": {
+      "connect": { "default": "mdi:bluetooth" },
+      "disconnect": { "default": "mdi:bluetooth-off" },
+      "favorite": { "default": "mdi:star" },
+      "point_up": { "default": "mdi:arrow-up-bold-circle-outline" },
+      "point_down": { "default": "mdi:arrow-down-bold-circle-outline" },
+      "calibration_begin": { "default": "mdi:tune-variant" },
+      "calibration_end": { "default": "mdi:check-circle-outline" },
+      "set_endpoint_up": { "default": "mdi:arrow-up-bold" },
+      "set_endpoint_down": { "default": "mdi:arrow-down-bold" },
+      "set_endpoint_third": { "default": "mdi:dots-horizontal-circle-outline" },
+      "set_angle_begin": { "default": "mdi:angle-acute" },
+      "set_angle_zero": { "default": "mdi:numeric-0-box-outline" },
+      "set_angle_ninety": { "default": "mdi:numeric-9-box-outline" },
+      "set_angle_one_eighty": { "default": "mdi:reload" },
+      "tilt_reverse": { "default": "mdi:swap-horizontal" },
+      "auto_position": { "default": "mdi:auto-fix" },
+      "set_direction": { "default": "mdi:compass-outline" },
+      "back_top_open": { "default": "mdi:arrow-up-bold-box-outline" },
+      "back_top_close": { "default": "mdi:arrow-down-bold-box-outline" },
+      "back_bottom_open": { "default": "mdi:arrow-up-bold-box" },
+      "back_bottom_close": { "default": "mdi:arrow-down-bold-box" }
+    },
+    "number": {
+      "brightness": { "default": "mdi:brightness-6" }
+    },
+    "select": {
+      "speed": { "default": "mdi:run-fast" },
+      "device_type": { "default": "mdi:chip" }
+    },
+    "sensor": {
+      "calibration": { "default": "mdi:tune" },
+      "connection": { "default": "mdi:bluetooth-connect" },
+      "direction": { "default": "mdi:compass" },
+      "point_type": { "default": "mdi:circle-edit-outline" },
+      "endpoints": { "default": "mdi:arrow-expand-vertical" },
+      "sensor_status": { "default": "mdi:weather-cloudy" }
+    },
+    "switch": {
+      "light": { "default": "mdi:lightbulb" },
+      "rain_sensor": { "default": "mdi:weather-rainy" },
+      "wind_sensor": { "default": "mdi:weather-windy" },
+      "combo_sensor": { "default": "mdi:weather-partly-cloudy" },
+      "slow_stop": { "default": "mdi:stop-circle-outline" }
+    }
+  }
+}
